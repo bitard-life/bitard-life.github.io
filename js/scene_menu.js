@@ -11,7 +11,8 @@ scenes.menu = {
         luji:           { type: 'image', src: '/res/final/luji.png?v=0.1' },
         anon:           { type: 'image', src: '/res/menu/anon.png?v=0.1' },
         objects:        { type: 'image', src: '/res/final/objects.png?v=0.1' },
-        sound_bg:       { type: 'sound', mp3: '/res/menu/5P4C3_C4173T.mp3?v=0.1', ogg: '/res/menu/5P4C3_C4173T.ogg?v=0.1' }
+        sound_bg:       { type: 'sound', mp3: '/res/menu/5P4C3_C4173T.mp3?v=0.1', ogg: '/res/menu/5P4C3_C4173T.ogg?v=0.1' },
+        sound_step:     { type: 'sound', mp3: '/res/final/step_dkiller2204.mp3?v=0.1', ogg: '/res/final/step_dkiller2204.ogg?v=0.1' }
     },
     
     //Слои сцены ----------------------------------------------------------------------------------
@@ -75,8 +76,7 @@ scenes.menu = {
                 scenes.menu.layers.push( 'menu' );
                 
                 //Запускаем фоновый звук
-                scenes.menu.resources.sound_bg.data.loop = true;
-                scenes.menu.resources.sound_bg.data.start();
+                scenes.menu.resources.sound_bg.play( 0, 0 );
                 
                 //Запускаем дождь
                 tmp.menu.rain = 0;
@@ -152,7 +152,7 @@ scenes.menu = {
                 if( obj_pos > -1 ) scenes.menu.layers.splice( obj_pos, 1 );
                 
                 //Выключаем фоновый звук
-                scenes.menu.resources.sound_bg.data.stop();
+                scenes.menu.resources.sound_bg.stop();
                 
                 //Отключаем дождь
                 game.postproc = scenes.empty;

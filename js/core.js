@@ -144,14 +144,34 @@ function LoadSceneMemory( resources, callback ) {
             
             //Звуковой файл -----------------------------------------------------------------------
             case 'sound':
+                //Асинхронное декодирование загруженного звукового файла
                 game.audio.context.decodeAudioData(
+                    //ArrayBuffer для декодирования
                     resources[ res_names[ i ] ].file,
-                    function( buffer) {
-                        let data = game.audio.context.createBufferSource();
-                        data.buffer = buffer;
-                        data.connect( game.audio.context.destination );
-                        //console.log( this );
-                        resources[ res_names[ i ] ].data = data;
+                    
+                    //Коллбек который вызовется при успешном декодировании
+                    function( decodedAudio ) {
+                        //Сохраняем ссылку на декодированное аудио
+                        resources[ res_names[ i ] ].data = decodedAudio;
+                        
+                        //Создаем интерфейс управления
+                        resources[ res_names[ i ] ].play = function( offset = 0, duration = 0 ) {
+                            //Создаем аудиобуффер
+                            resources[ res_names[ i ] ].source = game.audio.context.createBufferSource();
+                            //Помещаем в него декодированные данные
+                            resources[ res_names[ i ] ].source.buffer = resources[ res_names[ i ] ].data;
+                            //Подключаем аудиобуфер к ноде громкости
+                            resources[ res_names[ i ] ].source.connect( game.audio.gain );
+                            //resources[ res_names[ i ] ].source.connect( game.audio.context.destination );
+                            //Зацикливаем аудио, если надо
+                            if( duration == 0 ) resources[ res_names[ i ] ].source.loop = true;
+                            //Запускаем проигрывание
+                            resources[ res_names[ i ] ].source.start( 0, offset );
+                        };
+                        resources[ res_names[ i ] ].stop = function() {
+                            //Останавливаем проигрывание
+                            resources[ res_names[ i ] ].source.stop();  
+                        };
                     }
                 );
             break;
@@ -428,6 +448,8 @@ function GameInit() {
         window.AudioContext = window.AudioContext || window.webkitAudioContext;
         game.audio.context = new AudioContext();
         game.audio.gain = game.audio.context.createGain();
+        game.audio.gain.gain.value = parseFloat( ( config.volume / 100 ).toFixed( 1 ) );
+        game.audio.gain.connect ( game.audio.context.destination );
     } catch(e) {
         return InitError( 'AudioContext' );
     }
