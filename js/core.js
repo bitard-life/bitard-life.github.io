@@ -263,6 +263,12 @@ function UpdateScene() {
         tmp.fps_max = config.fps_max;
     }
     
+    //Изменяем уровень звука, если нужно
+    if( config.volume !== tmp.volume ) {
+        game.audio.gain.gain.value = parseFloat( ( config.volume / 100 ).toFixed( 1 ) );
+        tmp.volume = config.volume;
+    }
+    
     //Обновляем объекты сцены
     for( let i = 0; i < game.scene.layers.length; i++ ) {
         game.scene.objects[ game.scene.layers[ i ] ].update();
@@ -500,6 +506,8 @@ function GameInit() {
     document.body.removeChild( document.getElementById( 'error' ) );
     
     //Инициализируем временные переменные
+    tmp.volume = config.volume;
+    tmp.fps_max = config.fps_max;
     tmp.resize_ts = 0.0;
     tmp.draw_ts = 0.0;
     tmp.fps = {
