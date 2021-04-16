@@ -1,7 +1,7 @@
 //-------------------------------------------------------------------------------------------------
 var config = {
     //Ограничение максимального фпс
-    fps_max: 32,
+    fps_max: 30,
     
     //Настройки звука
     volume: 60,
@@ -11,6 +11,9 @@ var config = {
     
     //Включает отображение частоты кадров
     fps_show: true,
+    
+    //Полноэкранный режим
+    fullscreen: false,
     
     //Включает постобработку
     post_proc: true
@@ -35,13 +38,12 @@ var scenes = {
                 draw: function() {
                     let context = game.canvas.context;
                     let iter = tmp.loading;
-                    
+                    let over =  Math.ceil( ( game.canvas.height - ( window.innerHeight / game.canvas.scale ) ) / 2 );
                     let x = Math.ceil( game.canvas.width  / 2 ) - 40;
-                    let y = Math.ceil( game.canvas.height / 2 ) - 10;
+                    let y = Math.ceil( game.canvas.height / 2 ) - 10 + over;
                     
-                    context.fillStyle = '#000000';
-                    context.fillRect( 0, 0, game.canvas.width, game.canvas.height );
-                    context.fillStyle = '#3b3b3b';
+                    context.clearRect( 0, 0, game.canvas.width, game.canvas.height );
+                    context.fillStyle = '#bcbcbc';
                     
                     for( let i = 0, w = 4; i < 4; i++ ) {
                         if( iter[ i * 2 + 1 ] == 4 ) {
@@ -242,6 +244,11 @@ function FreeSceneMemory( resources ) {
     }
     
     if( config.debug ) console.log( '[LoadSceneMemory] free' );
+}
+
+
+function Fullscreen() {
+    if( config.debug ) console.log( '[Fullscreen] ' + config.fullscreen );
 }
 
 //-------------------------------------------------------------------------------------------------
