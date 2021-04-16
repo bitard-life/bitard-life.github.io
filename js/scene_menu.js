@@ -11,7 +11,7 @@ scenes.menu = {
         luji:           { type: 'image', src: '/res/final/luji.png?v=0.1' },
         anon:           { type: 'image', src: '/res/menu/anon.png?v=0.1' },
         objects:        { type: 'image', src: '/res/final/objects.png?v=0.1' },
-        sound_bg:       { type: 'sound', mp3: '/res/menu/5P4C3_C4173T.mp3?v=0.1', ogg: '/res/menu/5P4C3_C4173T.ogg?v=0.1' },
+        sound_bg:       { type: 'sound', mp3: '/res/menu/5P4C3_C4173T.mp3?v=0.2', ogg: '/res/menu/5P4C3_C4173T.ogg?v=0.2' },
        //sound_step:     { type: 'sound', mp3: '/res/final/step_dkiller2204.mp3?v=0.1', ogg: '/res/final/step_dkiller2204.ogg?v=0.1' }
     },
     
