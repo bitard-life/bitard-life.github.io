@@ -246,8 +246,15 @@ function FreeSceneMemory( resources ) {
     if( config.debug ) console.log( '[LoadSceneMemory] free' );
 }
 
-
+//Функция развертывания/свертывания на весь экран
 function Fullscreen() {
+    if ( !document.fullscreenElement ) {
+        document.documentElement.requestFullscreen();
+        config.fullscreen = true;
+    } else {
+        if (document.exitFullscreen) document.exitFullscreen();
+        config.fullscreen = false;
+    }
     if( config.debug ) console.log( '[Fullscreen] ' + config.fullscreen );
 }
 

@@ -239,6 +239,7 @@ scenes.menu = {
                 if( config.post_proc === false ) game.canvas.context.drawImage( scenes.menu.resources.settings.data, 211, 71, 63, 23, 371, 180, 63, 23 );
                 
                 //"На весь экран"
+                if( config.fullscreen ) game.canvas.context.drawImage( scenes.menu.resources.settings.data, 286, 23, 68, 23, 362, 208, 68, 23 );
                 
                 //"Громкость"
                 switch( config.volume ) {
