@@ -20,30 +20,43 @@ var config = {
 
 var scenes = {
     //Сцена заглушка
-    empty: function() {
-        return;
+    empty: {
+        resources: {},
+        layers: [],
+        objects: {}
     },
+    
     //Лол, сцена при загрузке уровня
-    loading: function() {
-        let context = game.canvas.context;
-        let iter = tmp.loading;
-        
-        let x = Math.ceil( game.canvas.width  / 2 ) - 40;
-        let y = Math.ceil( game.canvas.height / 2 ) - 10;
-        
-        context.fillStyle = '#000000';
-        context.fillRect( 0, 0, game.canvas.width, game.canvas.height );
-        context.fillStyle = '#3b3b3b';
-        
-        for( let i = 0, w = 4; i < 4; i++ ) {
-            if( iter[ i * 2 + 1 ] == 4 ) {
-                iter[ i * 2 ] = 1;
-            } else if( iter[ i * 2 + 1 ] == 20 ) {
-                iter[ i * 2 ] = 0;
+    loading: {
+        resources: {},
+        layers: [ 'animation' ],
+        objects: {
+            animation: {
+                draw: function() {
+                    let context = game.canvas.context;
+                    let iter = tmp.loading;
+                    
+                    let x = Math.ceil( game.canvas.width  / 2 ) - 40;
+                    let y = Math.ceil( game.canvas.height / 2 ) - 10;
+                    
+                    context.fillStyle = '#000000';
+                    context.fillRect( 0, 0, game.canvas.width, game.canvas.height );
+                    context.fillStyle = '#3b3b3b';
+                    
+                    for( let i = 0, w = 4; i < 4; i++ ) {
+                        if( iter[ i * 2 + 1 ] == 4 ) {
+                            iter[ i * 2 ] = 1;
+                        } else if( iter[ i * 2 + 1 ] == 20 ) {
+                            iter[ i * 2 ] = 0;
+                        }
+                        w = iter[ i * 2 + 1 ] += ( iter[ i * 2 ] == 0 ? -1 : 1 );
+                        context.fillRect( x + 4 + i * 20, y + 4 - Math.ceil( w / 2 ), w, w );
+                    }
+                },
+                update: function() {}
             }
-            w = iter[ i * 2 + 1 ] += ( iter[ i * 2 ] == 0 ? -1 : 1 );
-            context.fillRect( x + 4 + i * 20, y + 4 - Math.ceil( w / 2 ), w, w );
         }
+
     }
 };
 
@@ -59,11 +72,17 @@ var game = {
         resize: true
     },
     
-    //Функция отрисовки кадра текущей сцены (заменяется при переключении на другую)
-    draw: scenes.empty,
+    //Интервал обновления в миллисекундах
+    delay: Math.ceil( 1000.0 / config.fps_max ),
     
-    //Функция постобработки кадра
-    postproc: scenes.empty,
+    //Активная сцена (заменяется при актиавции сцены)
+    scene: scenes.empty,
+    
+    //Функция постобработки кадра (заменяется при смене эффекта)
+    postproc: function() { return; },
+    
+    //Текущий прогресс в прохождении
+    checkpoint: 0,
     
     //Звук
     audio: {
@@ -92,9 +111,9 @@ var game = {
 };
 
 var tmp = {
-    loading: [ 1, 4,  1, 9,  1, 14,  0, 20 ]
+    loading: [ 1, 4,  1, 9,  1, 14,  0, 20 ],
+    fps_max: config.fps_max
 };
-
 //-------------------------------------------------------------------------------------------------
 
 //Загрузка ресурсов сцены в оперативную память
@@ -162,7 +181,6 @@ function LoadSceneMemory( resources, callback ) {
                             resources[ res_names[ i ] ].source.buffer = resources[ res_names[ i ] ].data;
                             //Подключаем аудиобуфер к ноде громкости
                             resources[ res_names[ i ] ].source.connect( game.audio.gain );
-                            //resources[ res_names[ i ] ].source.connect( game.audio.context.destination );
                             //Зацикливаем аудио, если надо
                             if( duration == 0 ) resources[ res_names[ i ] ].source.loop = true;
                             //Запускаем проигрывание
@@ -226,18 +244,34 @@ function FreeSceneMemory( resources ) {
     if( config.debug ) console.log( '[LoadSceneMemory] free' );
 }
 
-//---------------------------------------------------------------------------------------------
-//Main loop -----------------------------------------------------------------------------------
-//---------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+//Main loops --------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+
+//Цикл обсчета сцены ------------------------------------------------------------------------------
+function UpdateScene() {
+    //Обновляем частоту кадров, если нужно
+    if( config.fps_max !== tmp.fps_max ) {
+        game.delay = Math.ceil( 1000.0 / config.fps_max );
+        tmp.fps_max = config.fps_max;
+    }
     
-//Главный цикл
-function DrawCanvas() {
+    //Обновляем объекты сцены
+    for( let i = 0; i < game.scene.layers.length; i++ ) {
+        game.scene.objects[ game.scene.layers[ i ] ].update();
+    }
+    
+    //Запускаем очередную итерацию
+    setTimeout( UpdateScene, game.delay );
+};
+
+//Цикл отрисовки сцены ----------------------------------------------------------------------------
+function DrawScene() {
     //Получаем временную метку начала очередной отрисовки кадра
     let draw_ts = performance.now();
     
-    //Ограничиваем главный цикл под fps
-    let fps_to_ms = 1000.0 / config.fps_max;
-    if( draw_ts - tmp.draw_ts > fps_to_ms ) {
+    //Ограничиваем частоту отрисовки
+    if( draw_ts - tmp.draw_ts > game.delay ) {
         tmp.draw_ts = draw_ts;
         
         //Вычисление реальной частоты кадров
@@ -246,6 +280,7 @@ function DrawCanvas() {
         } else {
             //Обновляем на актуальное
             game.fps = tmp.fps.frames;
+            
             //Сбрасываем временную метку и счетчик кадров
             tmp.fps.prev_ts = draw_ts;
             tmp.fps.frames = 0;
@@ -303,12 +338,17 @@ function DrawCanvas() {
             context.lineCap = 'butt';
             context.strokeRect( 0, 0, game.canvas.width, game.canvas.height );
             
-            //Отрисовка сцены
-            game.draw();
+            //Отрисовка объектов сцены
+            for( let i = 0; i < game.scene.layers.length; i++ ) {
+                game.scene.objects[ game.scene.layers[ i ] ].draw();
+            }
             
             //Постобработка кадра
-            if( config.post_proc ) game.postproc();
+            if( config.post_proc ) {
+                game.postproc();
+            }
         } else {
+            //Рисуем значок поворота экрана мобилы в горизонталь
             let x_pos = Math.ceil( game.canvas.width / 2 );
             let y_pos = Math.ceil( game.canvas.height / 2 );
             context.strokeStyle = '#FFFFFF';
@@ -347,7 +387,8 @@ function DrawCanvas() {
         }
     }
     
-    window.requestAnimationFrame( DrawCanvas );
+    //Запускаем очередную отрисовку кадра, когда это будет удобно браузеру
+    window.requestAnimationFrame( DrawScene );
 };
 
 //Инициализация игровго движка
@@ -370,16 +411,10 @@ function GameInit() {
         return InitError( 'localStorage' );
     }
     
-    //Получаем id игрока
-    let local_user_id = localStorage.getItem( 'user_id' );
-    if( local_user_id !== null ) {
-        game.user_id = local_user_id;
-    } else {
-        //Гененрируем id
-        game.user_id = ( Math.random().toString( 36 ).substr( 2, 9 ) + 'p' + Math.random().toString( 36 ).substr( 2, 9 ) ).substr( 0, 16 );
-        
-        //Сохраняем его в хранилище
-        localStorage.setItem( 'user_id', game.user_id );
+    //Получаем прогресс игрока
+    let user_checkpoint = localStorage.getItem( 'checkpoint' );
+    if( user_checkpoint !== null ) {
+        game.checkpoint = user_checkpoint;
     }
     
     //---------------------------------------------------------------------------------------------
@@ -469,7 +504,8 @@ function GameInit() {
     //Запускаем сцену загрузки ресурсов -----------------------------------------------------------
     //---------------------------------------------------------------------------------------------
     scenes.preloader.enable();
-    window.requestAnimationFrame( DrawCanvas );
+    setTimeout( UpdateScene, game.delay );
+    window.requestAnimationFrame( DrawScene );
 };
 //-------------------------------------------------------------------------------------------------
 

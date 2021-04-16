@@ -64,7 +64,42 @@ scenes.preloader = {
             //Добавляем объект на сцену
             add: function() {
                 if( config.debug ) console.log( '[preloader.pogressbar] add' );
+                
+                //Включаем отрисовку объекта
                 scenes.preloader.layers.push( 'progressbar' );
+                
+                //Инициалищируем переменные
+                tmp.preloader.progressbar = {};
+                scenes.preloader.objects.progressbar.update();
+            },
+            
+            //Обновляем объект
+            update: function() {
+                //Получаем короткие ссылки
+                let tmp_pre = tmp.preloader;
+                let tmp_prog = tmp.preloader.progressbar;
+                let res = scenes.preloader.resources;
+
+                //Обновляем лого
+                tmp_prog.dx = Math.ceil( ( game.canvas.width / 2) - ( res.logo.data.width / 2) );
+                tmp_prog.dy = Math.ceil( ( game.canvas.height / 2) - ( res.logo.data.height / 2 ) - 10 );
+                
+                //Обновляем контур прогрессбара
+                tmp_prog.barW = Math.ceil( ( game.canvas.width / 100) * 80 );
+                tmp_prog.barX = Math.ceil( ( game.canvas.width - tmp_prog.barW ) / 2 );
+                tmp_prog.barY = Math.ceil( game.canvas.height  / 2 ) + ( res.logo.data.height / 2 ) - 10;
+                    
+                //Вычисляем, сколько процентов загружено
+                if( tmp_pre.bytes_load > 0 ) tmp_prog.precentage = Math.ceil( 100 / ( tmp_pre.bytes_all / tmp_pre.bytes_load ) );
+                
+                //Файлы загрузились
+                if( tmp.preloader.files_load == tmp.preloader.files_count ) {
+                    //Завершаем текущую сцену
+                    scenes.preloader.disable();
+                    
+                    //Запускаем сцену меню
+                    scenes.menu.enable();
+                }
             },
             
             //Отрисовываем объект
@@ -72,6 +107,7 @@ scenes.preloader = {
                 //Получаем короткие ссылки
                 let context = game.canvas.context;
                 let tmp_pre = tmp.preloader;
+                let tmp_prog = tmp.preloader.progressbar;
                 let res = scenes.preloader.resources;
                     
                 //Очищаем холст
@@ -79,28 +115,19 @@ scenes.preloader = {
                 context.clearRect( 0, 0, game.canvas.width, game.canvas.height );
                 
                 //Рисуем лого
-                let dx = Math.ceil( ( game.canvas.width / 2) - ( res.logo.data.width / 2) );
-                let dy = Math.ceil( ( game.canvas.height / 2) - ( res.logo.data.height / 2 ) - 10 );
-                context.drawImage( res.logo.data, dx, dy );
+                context.drawImage( res.logo.data, tmp_prog.dx, tmp_prog.dy );
                 
                 //Рисуем контур прогрессбара
-                let barW = Math.ceil( ( game.canvas.width / 100) * 80 );
-                let barX = Math.ceil( ( game.canvas.width - barW ) / 2 );
-                let barY = Math.ceil( game.canvas.height  / 2 ) + ( res.logo.data.height / 2 ) - 10;
                 context.fillStyle = '#222222';
-                context.fillRect( barX, barY, barW, 20 );
+                context.fillRect( tmp_prog.barX, tmp_prog.barY, tmp_prog.barW, 20 );
                     
                 //Рисуем полосу прогресса
                 if( tmp_pre.bytes_load > 0 ) {
-                    //Вычисляем, сколько процентов загружено
-                    let precentage = Math.ceil( 100 / ( tmp_pre.bytes_all / tmp_pre.bytes_load ) );
-                    
-                    //Рисуем полосу
                     context.fillStyle = '#888888';
                     context.fillRect(
-                        barX + 5,
-                        barY + 5,
-                        ( ( barW - 10 ) / 100 ) * precentage,
+                        tmp_prog.barX + 5,
+                        tmp_prog.barY + 5,
+                        ( ( tmp_prog.barW - 10 ) / 100 ) * tmp_prog.precentage,
                         10
                     );
                 }
@@ -108,9 +135,13 @@ scenes.preloader = {
             
             //Удаляем объект со сцены
             del: function() {
+                //Удаляем из списка на отрисовку
                 if( config.debug ) console.log( '[preloader.pogressbar] del' );
                 let obj_pos = scenes.preloader.layers.indexOf( 'progressbar' );
                 if( obj_pos > -1 ) scenes.preloader.layers.splice( obj_pos, 1 );
+                
+                //Удаляем временные переменные
+                delete tmp.preloader.progressbar;
             }
         }
     },
@@ -185,8 +216,8 @@ scenes.preloader = {
             //Добавляем прогрессбар на сцену
             scenes.preloader.objects.progressbar.add();
             
-            //Запускаем отрисовку сцены
-            game.draw = scenes.preloader.update;
+            //Запускаем сцену
+            game.scene = scenes.preloader;
         } );
         
         //Оцениваем размеры ресурсных файлов, через http-заголовок HEAD
@@ -256,29 +287,10 @@ scenes.preloader = {
         }, 500 );
     },
     
-    //Обновление сцены ----------------------------------------------------------------------------
-    update: function() {
-        let tmp_pre = tmp.preloader;
-        
-        //Рисуем объекты сцены
-        for( let i = 0; i < scenes.preloader.layers.length; i++ ) {
-            scenes.preloader.objects[ scenes.preloader.layers[ i ] ].draw();
-        }
-        
-        //Файлы загрузились
-        if( tmp_pre.files_load == tmp_pre.files_count ) {
-            //Завершаем текущую сцену
-            scenes.preloader.disable();
-            
-            //Запускаем сцену лобби
-            scenes.menu.enable();
-        }
-    },
-    
     //Выгрузка сцены из памяти --------------------------------------------------------------------
     disable: function() {
-        //Выключаем отрисовку сцены
-        game.draw = scenes.empty;
+        //Выключаем сцену
+        game.scene = scenes.empty;
         
         //Возвращаем прежний fps
         config.fps_max = tmp.preloader.prev_fps;

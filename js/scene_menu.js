@@ -34,18 +34,15 @@ scenes.menu = {
                 scenes.menu.layers.push( 'disclaimer' );
             },
             
-            //Отрисовываем
-            draw: function() {
-                 //Рисуем дисклеймер 
-                game.canvas.context.drawImage( scenes.menu.resources.disclaimer.data, 0, 0 );
-                
+            //Обновляем
+            update: function() {
                 //Кликнули
                 if( tmp.menu.click_x != game.cursor.click_x  &&  tmp.menu.click_y != game.cursor.click_y ) {
                     tmp.menu.click_x = Math.ceil( game.cursor.click_x / game.canvas.scale );
                     tmp.menu.click_y = Math.ceil( game.cursor.click_y / game.canvas.scale );
                     
+                    //Удаляем чейнджлог со сцены при попадании на кнопку
                     if( tmp.menu.click_x > 250 && tmp.menu.click_x < 390 && tmp.menu.click_y > 300 && tmp.menu.click_y < 350 ) {
-                        //Удаляем чейнджлог со сцены
                         scenes.menu.objects.disclaimer.del();
                     }
                     
@@ -54,11 +51,17 @@ scenes.menu = {
                 } 
             },
             
+            //Отрисовываем
+            draw: function() {
+                 //Рисуем дисклеймер 
+                game.canvas.context.drawImage( scenes.menu.resources.disclaimer.data, 0, 0 );
+            },
+            
             //Удаляем объект со сцены
             del: function() {
                 if( config.debug ) console.log( '[menu.disclaimer] del' );
                 
-                //Прекращаем отрисовку объекта
+                //Удаляем из списка на отрисовку
                 let obj_pos = scenes.menu.layers.indexOf( 'disclaimer' );
                 if( obj_pos > -1 ) scenes.menu.layers.splice( obj_pos, 1 );
                 
@@ -66,7 +69,8 @@ scenes.menu = {
                 scenes.menu.objects.menu.add();
             }
         },
-        //Дороги
+        
+        //Главное меню
         menu: {
             //Добавляем объект на сцену
             add: function() {
@@ -78,7 +82,7 @@ scenes.menu = {
                 //Запускаем фоновый звук
                 scenes.menu.resources.sound_bg.play( 0, 0 );
                 
-                //Запускаем дождь
+                //Запускаем дождь через постобработку
                 tmp.menu.rain = 0;
                 game.postproc = function() {
                     tmp.menu.rain += 20;
@@ -88,11 +92,33 @@ scenes.menu = {
                 
                 //Настраиваем движение машин [ x, y, тип авто ]
                 tmp.menu.auto = [ [40,0,0], [349,0,1], [20,0,2], [250,0,3] ];
-                tmp.menu.x = 600;
-                tmp.menu.y = 330;
+                
+                //Пункты меню
+                tmp.menu.select = 0;
+                tmp.menu.selected = 0;
             },
             
-            auto: function() {
+            //Обновляем
+            update: function() {
+                //Получаем короткие ссылки
+                let tmp_menu = tmp.menu;
+                
+                //Конвертируем координаты эрана в кординаты холста
+                let pos_x = Math.ceil( game.cursor.pos_x / game.canvas.scale );
+                let pos_y = Math.ceil( game.cursor.pos_y / game.canvas.scale );
+                
+                //Пункты меню
+                if( pos_x > 15 && pos_x < 140 && pos_y > 275 && pos_y < 290) {
+                    tmp_menu.select = 1;
+                } else if( game.checkpoint > 0 && pos_x > 15 && pos_x < 160 && pos_y > 300 && pos_y < 315) {
+                    tmp_menu.select = 2;
+                } else if( pos_x > 15 && pos_x < 140 && pos_y > 325 && pos_y < 340) {
+                    tmp_menu.select = 3;
+                } else {
+                    tmp_menu.select = 0;
+                }
+                
+                //Движение автомобилей
                 for( let i = 0; i<4; i++) {
                     let x = tmp.menu.auto[ i ][ 0 ];
                     x += ( tmp.menu.auto[ i ][ 2 ] > 1 ? -1 : 1 );
@@ -111,11 +137,11 @@ scenes.menu = {
                 }
             },
             
-            //Отрисовываем объекты в меню
+            //Отрисовываем
             draw: function() {
                 //Получаем короткие ссылки
                 let context = game.canvas.context;
-                let tmp_lob = tmp.menu;
+                let tmp_menu = tmp.menu;
                 let res = scenes.menu.resources;
                 
                 context.fillStyle = '#000000';
@@ -123,8 +149,7 @@ scenes.menu = {
                 
                 context.drawImage( res.dorogi.data, 155, 62, 640, 360, 0, 0, 640, 360 );
                 
-                //Костыль движения авто
-                scenes.menu.objects.menu.auto();
+                //Движение авто
                 for( let x = 0; x < 4; x++ ) {
                     context.drawImage(
                         res.auto.data,
@@ -136,11 +161,19 @@ scenes.menu = {
                     );
                 }
                 
-                
                 context.drawImage( res.objects.data, 155-31, 62+56, 640, 360, 0, 0, 640, 360 );
                 context.drawImage( res.krisha.data,  155+121, 62-256, 640, 360, 0, 0, 640, 360 );
                 context.drawImage( res.luji.data,  155-250, 62-328, 640, 360, 0, 0, 640, 360 );
-                context.drawImage( res.anon.data,  155-464, 62-282, 640, 360, 0, 0, 640, 360 );
+                
+                //Сидящий анон
+                context.drawImage( res.anon.data,  0, 0, 53, 135, 309, 219, 53, 135 );
+                
+                //Пункты меню
+                context.drawImage( res.menu_btn.data,  ( game.checkpoint > 0 ? 137 : 0 ), 0, 137, 67, 20, 275, 137, 67 );
+                if( tmp_menu.select > 0 ) {
+                    let offset = ( tmp_menu.select - 1) * 24;
+                    context.drawImage( res.menu_btn.data,  274, offset , 137, 19, 20, 275 + offset, 137, 19 );
+                }
             },
             
             //Удаляем объект со сцены
@@ -155,42 +188,38 @@ scenes.menu = {
                 scenes.menu.resources.sound_bg.stop();
                 
                 //Отключаем дождь
-                game.postproc = scenes.empty;
+                game.postproc = function() { return; };
             }
         }
     },
+    
     //Создание сцены ------------------------------------------------------------------------------
     enable: function() {
         if( config.debug ) console.log( '[menu] scene enable' );
         //Создаем временные переменные для сцены
         tmp.menu = {};
         
-        //Запускаем отрисовку сцены загрузки
-        game.draw = scenes.loading;
+        //Запускаем сцену загрузки, пока инициализируются ресурсы игры
+        game.scene = scenes.loading;
         
         //Загружаем ресурсы сцены в опративную память
         LoadSceneMemory( scenes.menu.resources, function() {
             //Добавляем чейнджлог на сцену
             scenes.menu.objects.disclaimer.add();
             
-            //Запускаем отрисовку сцены
-            game.draw = scenes.menu.update;
+            //Запускаем сцену
+            game.scene = scenes.menu;
         } );
-    },
-    
-    //Обновление сцены ----------------------------------------------------------------------------
-    update: function() {
-        let context = game.canvas.context;
-        
-        context.clearRect( 0, 0, game.canvas.width, game.canvas.height );
-        
-        //Рисуем объекты сцены
-        for( let i = 0; i < scenes.menu.layers.length; i++ ) {
-            scenes.menu.objects[ scenes.menu.layers[ i ] ].draw();
-        }
     },
     
     //Выгрузка сцены из памяти --------------------------------------------------------------------
     disable: function() {
+        //Выключаем сцену
+        game.scene = scenes.empty;
+        
+        //Выгружаем ресурсы сцены из опративной памяти
+        FreeSceneMemory( scenes.menu.resources );
+        
+        if( config.debug ) console.log( '[preloader] menu disable' );
     }
 };
