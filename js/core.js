@@ -252,9 +252,10 @@ function Fullscreen() {
         document.documentElement.requestFullscreen();
         config.fullscreen = true;
     } else {
-        if (document.exitFullscreen) document.exitFullscreen();
+        if ( document.exitFullscreen ) document.exitFullscreen();
         config.fullscreen = false;
     }
+    
     if( config.debug ) console.log( '[Fullscreen] ' + config.fullscreen );
 }
 
@@ -473,9 +474,18 @@ function GameInit() {
         game.cursor.pressed = false;
     }, false );
     
-     //Сообщаем игре, что изменились размеры окна
+    //Сообщаем игре, что изменились размеры окна
     window.addEventListener( 'resize', function() {
         game.canvas.resize = true;
+    }, false );
+    
+    //Сообщаем игре, что  изменился полноэкранный режим
+    document.addEventListener( 'fullscreenchange', function( e ) {
+        if ( document.fullscreenElement ) {
+            config.fullscreen = true;
+        } else {
+            config.fullscreen = false;
+        }
     }, false );
     
     //---------------------------------------------------------------------------------------------
