@@ -211,32 +211,52 @@ scenes.menu = {
             
             //Отрисовываем
             draw: function() {
+                let tmp_var = 0;
                 game.canvas.context.drawImage( scenes.menu.resources.settings.data, 0, 0, 285, 201, 178, 80, 285, 201 );
                 
                 //"Ограничить FPS"
-                let fps_max = 0;
                 switch( config.fps_max ) {
                     case 30:
-                        fps_max = 0;
+                    default:
+                        tmp_var = 0;
                         break;
                     case 40:
-                        fps_max = 1;
+                        tmp_var = 1;
                         break;
                     case 50:
-                        fps_max = 2;
+                        tmp_var = 2;
                         break;
                     case 60:
-                        fps_max = 3;
+                        tmp_var = 3;
                         break;
                 }
-                if( fps_max > 0) game.canvas.context.drawImage( scenes.menu.resources.settings.data, 255 + fps_max*30, 0, 30, 22, 385, 118, 30, 22 );
+                if( tmp_var > 0) game.canvas.context.drawImage( scenes.menu.resources.settings.data, 255 + tmp_var*30, 0, 30, 22, 385, 118, 30, 22 );
                 
                 //"Показывать FPS"
                 if( config.fps_show ) game.canvas.context.drawImage( scenes.menu.resources.settings.data, 286, 23, 68, 23, 388, 150, 68, 23 );
+                
                 //"Постобработка"
                 if( config.post_proc === false ) game.canvas.context.drawImage( scenes.menu.resources.settings.data, 211, 71, 63, 23, 371, 180, 63, 23 );
+                
                 //"На весь экран"
+                
                 //"Громкость"
+                switch( config.volume ) {
+                    case 30:
+                        tmp_var = 46;
+                        break;
+                    case 60:
+                    default:
+                        tmp_var = 0;
+                        break;
+                    case 100:
+                        tmp_var = 69;
+                        break;
+                    case 150:
+                        tmp_var = 92;
+                        break;
+                }
+                if( tmp_var > 0) game.canvas.context.drawImage( scenes.menu.resources.settings.data, 286, tmp_var, 96, 22, 323, 237, 96, 22 );
             },
             
             //Удаляем объект со сцены
