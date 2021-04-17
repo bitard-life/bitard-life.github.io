@@ -7,7 +7,7 @@ var config = {
     volume: 60,
     
     //Включает вывод в консоль отладотчной информации
-    debug: true,
+    debug: false,
     
     //Включает отображение частоты кадров
     fps_show: true,
@@ -16,7 +16,10 @@ var config = {
     fullscreen: false,
     
     //Включает постобработку
-    post_proc: true
+    post_proc: true,
+    
+    //Текущий прогресс в прохождении
+    checkpoint: 0,
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -82,9 +85,6 @@ var game = {
     
     //Функция постобработки кадра (заменяется при смене эффекта)
     postproc: function() { return; },
-    
-    //Текущий прогресс в прохождении
-    checkpoint: 0,
     
     //Звук
     audio: {
@@ -248,12 +248,38 @@ function FreeSceneMemory( resources ) {
 
 //Функция развертывания/свертывания на весь экран
 function Fullscreen() {
-    if ( !document.fullscreenElement ) {
-        document.documentElement.requestFullscreen();
-        config.fullscreen = true;
+    let status = null;
+    
+    if( !document.fullscreenElement && !document.mozFullScreenElement && !document.webkitFullscreenElement ) {
+        if( document.documentElement.requestFullscreen ) {
+            document.documentElement.requestFullscreen();
+            status = 1;
+        } else if( document.documentElement.mozRequestFullScreen ) {
+            document.documentElement.mozRequestFullScreen();
+            status = 1;
+        } else if( document.documentElement.webkitRequestFullscreen ) {
+            document.documentElement.webkitRequestFullscreen( Element.ALLOW_KEYBOARD_INPUT );
+            status = 1;
+        }
     } else {
-        if ( document.exitFullscreen ) document.exitFullscreen();
-        config.fullscreen = false;
+        if( document.exitFullscreen ) {
+            document.exitFullscreen();
+            status = 0;
+        } else if( document.cancelFullScreen ) {
+            document.cancelFullScreen();
+            status = 0;
+        } else if( document.mozCancelFullScreen ) {
+            document.mozCancelFullScreen();
+            status = 0;
+        } else if( document.webkitCancelFullScreen ) {
+            document.webkitCancelFullScreen();
+            status = 0;
+        }
+    }
+    
+    if( status !== null ) {
+        config.fullscreen = ( status === 0 ? false : true );
+        localStorage.setItem( 'fullscreen', config.fullscreen );
     }
     
     if( config.debug ) console.log( '[Fullscreen] ' + config.fullscreen );
@@ -265,6 +291,9 @@ function Fullscreen() {
 
 //Цикл обсчета сцены ------------------------------------------------------------------------------
 function UpdateScene() {
+    //Получаем временную метку начала обсчета сцены
+    tmp.update_ts = performance.now();
+    
     //Обновляем частоту кадров, если нужно
     if( config.fps_max !== tmp.fps_max ) {
         game.delay = Math.ceil( 1000.0 / config.fps_max );
@@ -288,7 +317,7 @@ function UpdateScene() {
 
 //Цикл отрисовки сцены ----------------------------------------------------------------------------
 function DrawScene() {
-    //Получаем временную метку начала очередной отрисовки кадра
+    //Получаем временную метку начала отрисовки сцены
     let draw_ts = performance.now();
     
     //Ограничиваем частоту отрисовки
@@ -432,11 +461,21 @@ function GameInit() {
         return InitError( 'localStorage' );
     }
     
-    //Получаем прогресс игрока
-    let user_checkpoint = localStorage.getItem( 'checkpoint' );
-    if( user_checkpoint !== null ) {
-        game.checkpoint = user_checkpoint;
-    }
+    //Загружаем конфиг
+    Object.getOwnPropertyNames( config ).forEach( function( name ) {
+        if( name == 'debug' ) return;
+                                                 
+        if( localStorage.getItem( name ) !== null ) {
+            config[ name ] = localStorage.getItem( name );
+            if( config[ name ] === 'true'  || config[ name ] === 'false' ) {
+                config[ name ] = ( config[ name ] === 'true' ? true : false );
+            } else {
+                config[ name ] = parseInt( config[ name ] );
+            }
+        } else {
+            localStorage.setItem( name, config[ name ]  );
+        }
+    } );
     
     //---------------------------------------------------------------------------------------------
     //Canvas --------------------------------------------------------------------------------------
@@ -460,6 +499,8 @@ function GameInit() {
         game.cursor.pos_x = game.cursor.click_x = e.clientX - rect.left;
         game.cursor.pos_y = game.cursor.click_y = e.clientY - rect.top;
         game.cursor.pressed = true;
+        
+        //Разрешение аудио
         if( !game.audio.enabled ) {
             game.audio.enabled = true;
             game.audio.context.resume();
@@ -481,11 +522,12 @@ function GameInit() {
     
     //Сообщаем игре, что  изменился полноэкранный режим
     document.addEventListener( 'fullscreenchange', function( e ) {
-        if ( document.fullscreenElement ) {
+        if ( !!document.fullscreenElement || !!document.mozFullScreenElement || !!document.webkitFullscreenElement ) {
             config.fullscreen = true;
         } else {
             config.fullscreen = false;
         }
+        localStorage.setItem( 'fullscreen', config.fullscreen );
     }, false );
     
     //---------------------------------------------------------------------------------------------
@@ -526,6 +568,7 @@ function GameInit() {
     tmp.volume = config.volume;
     tmp.fps_max = config.fps_max;
     tmp.resize_ts = 0.0;
+    tmp.update_ts = 0.0;
     tmp.draw_ts = 0.0;
     tmp.fps = {
         frames: 0,

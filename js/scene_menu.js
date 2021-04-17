@@ -59,8 +59,14 @@ scenes.menu = {
                     let pos_x = Math.ceil( click_x / game.canvas.scale );
                     let pos_y = Math.ceil( click_y / game.canvas.scale );
                     
-                    //Удаляем чейнджлог со сцены при попадании на кнопку
+                    //Нажали на Ок
                     if( pos_x > 250 && pos_x < 390 && pos_y > 300 && pos_y < 350 ) {
+                        //Запускаем на весь экран
+                        if( config.fullscreen && !document.fullscreenElement && !document.mozFullScreenElement && !document.webkitFullscreenElement ) {
+                            Fullscreen();
+                        }
+                        
+                        //Удаляем чейнджлог со сцены
                         scenes.menu.objects.disclaimer.del();
                     }
                 }
@@ -149,12 +155,15 @@ scenes.menu = {
                                     config.fps_max = 30;
                                     break;
                             }
+                            localStorage.setItem( 'fps_max', config.fps_max );
                         } else if ( click_y > 150 && click_y < 178 ) {
                             //"Показывать FPS"
                             config.fps_show = ( config.fps_show ? false : true );
+                            localStorage.setItem( 'fps_show', config.fps_show );
                         } else if ( click_y > 178 && click_y < 208 ) {
                             //"Постобработка"
                             config.post_proc = ( config.post_proc ? false : true );
+                            localStorage.setItem( 'post_proc', config.post_proc );
                         } else if ( click_y > 208 && click_y < 237 ) {
                             //"На весь экран"
                             Fullscreen();
@@ -175,6 +184,7 @@ scenes.menu = {
                                     config.volume = 30;
                                     break;
                             }
+                            localStorage.setItem( 'volume', config.volume );
                         }
                     }
                     
@@ -197,7 +207,7 @@ scenes.menu = {
                     /*if( pos_x > 15 && pos_x < 140 && pos_y > 275 && pos_y < 290 ) {
                         //"Новая игра"
                         tmp_main.select = 1;
-                    } else if( game.checkpoint > 0 && pos_x > 15 && pos_x < 160 && pos_y > 300 && pos_y < 315 ) {
+                    } else if( config.checkpoint > 0 && pos_x > 15 && pos_x < 160 && pos_y > 300 && pos_y < 315 ) {
                         //"Продолжить"
                         tmp_main.select = 2;
                     } else if( pos_x > 15 && pos_x < 140 && pos_y > 325 && pos_y < 340 ) {
@@ -293,14 +303,17 @@ scenes.menu = {
                 
                 //Запускаем дождь через постобработку
                 tmp.menu.main.rain = 0;
+                tmp.menu.main.rain_ts = tmp.draw_ts;
                 game.postproc = function() {
-                    tmp.menu.main.rain += 20;
+                    tmp.menu.main.rain += Math.floor( ( tmp.draw_ts - tmp.menu.main.rain_ts ) / 2 );
+                    tmp.menu.main.rain_ts = tmp.draw_ts;
                     if ( tmp.menu.main.rain > 200 ) tmp.menu.main.rain = 0;
                     game.canvas.context.drawImage( scenes.menu.resources.rain.data, 0, 200 - tmp.menu.main.rain, 640, 360, 0, 0, 640, 360 );
                 };
                 
                 //Настраиваем движение машин [ x, y, тип авто ]
                 tmp.menu.main.auto = [ [40,0,0], [349,0,1], [20,0,2], [250,0,3] ];
+                tmp.menu.main.auto_ts = tmp.update_ts;
                 
                 //Пункты меню
                 tmp.menu.main.select = 0;
@@ -347,7 +360,7 @@ scenes.menu = {
                         if( pos_x > 15 && pos_x < 140 && pos_y > 275 && pos_y < 290 ) {
                             //"Новая игра"
                             tmp_main.select = 1;
-                        } else if( game.checkpoint > 0 && pos_x > 15 && pos_x < 160 && pos_y > 300 && pos_y < 315 ) {
+                        } else if( config.checkpoint > 0 && pos_x > 15 && pos_x < 160 && pos_y > 300 && pos_y < 315 ) {
                             //"Продолжить"
                             tmp_main.select = 2;
                         } else if( pos_x > 15 && pos_x < 140 && pos_y > 325 && pos_y < 340 ) {
@@ -359,22 +372,26 @@ scenes.menu = {
                     }
                 }
                 
-                //Движение автомобилей
-                for( let i = 0; i<4; i++) {
-                    let x = tmp_main.auto[ i ][ 0 ];
-                    x += ( tmp_main.auto[ i ][ 2 ] > 1 ? -1 : 1 );
+                //Движение автомобилей( 30 fps )
+                if( tmp.update_ts - tmp.menu.main.auto_ts > 33.3  ) {
+                    tmp.menu.main.auto_ts = tmp.update_ts;
                     
-                    //Движение закончилось
-                    if( x == 380 || x == 0 ) {
-                        //Сбрасываем координату
-                        x = ( tmp_main.auto[ i ][ 2 ] > 1 ? 380 - Math.round(Math.random()) * 6 : 0 + Math.round(Math.random()) * 6 );
-                        //Ставим случайную тачку
-                        tmp_main.auto[ i ][ 2 ] = Math.round(Math.random()) + ( tmp_main.auto[ i ][ 2 ] > 1 ? 2 : 0 );
+                    for( let i = 0; i < 4; i++) {
+                        let x = tmp_main.auto[ i ][ 0 ];
+                        x += ( tmp_main.auto[ i ][ 2 ] > 1 ? -1 : 1 );
+                        
+                        //Движение закончилось
+                        if( x == 380 || x == 0 ) {
+                            //Сбрасываем координату
+                            x = ( tmp_main.auto[ i ][ 2 ] > 1 ? 380 - Math.round(Math.random()) * 6 : 0 + Math.round(Math.random()) * 6 );
+                            //Ставим случайную тачку
+                            tmp_main.auto[ i ][ 2 ] = Math.round(Math.random()) + ( tmp_main.auto[ i ][ 2 ] > 1 ? 2 : 0 );
+                        }
+                        
+                        //Обновляем координаты
+                        tmp_main.auto[ i ][ 0 ] = x;
+                        tmp_main.auto[ i ][ 1 ] = 520 - Math.ceil( x * 0.75 );
                     }
-                    
-                    //Обновляем координаты
-                    tmp_main.auto[ i ][ 0 ] = x;
-                    tmp_main.auto[ i ][ 1 ] = 520 - Math.ceil( x * 0.75 );
                 }
             },
             
@@ -410,7 +427,7 @@ scenes.menu = {
                 context.drawImage( res.anon.data,  0, 0, 53, 135, 309, 219, 53, 135 );
                 
                 //Пункты меню
-                context.drawImage( res.menu_btn.data,  ( game.checkpoint > 0 ? 137 : 0 ), 0, 137, 67, 20, 275, 137, 67 );
+                context.drawImage( res.menu_btn.data,  ( config.checkpoint > 0 ? 137 : 0 ), 0, 137, 67, 20, 275, 137, 67 );
                 if( tmp_main.select > 0 ) {
                     let offset = ( tmp_main.select - 1) * 24;
                     context.drawImage( res.menu_btn.data,  274, offset , 137, 19, 20, 275 + offset, 137, 19 );
