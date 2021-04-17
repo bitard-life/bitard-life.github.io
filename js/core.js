@@ -10,7 +10,7 @@ var config = {
     debug: false,
     
     //Включает отображение частоты кадров
-    fps_show: true,
+    fps_show: false,
     
     //Полноэкранный режим
     fullscreen: false,
