@@ -3,23 +3,26 @@ var config = {
     //Ограничение максимального фпс
     fps_max: 30,
     
-    //Настройки звука
-    volume: 60,
-    
-    //Включает вывод в консоль отладотчной информации
-    debug: false,
-    
-    //Включает отображение частоты кадров
+    //Включает отображение фпс
     fps_show: false,
-    
-    //Полноэкранный режим
-    fullscreen: false,
     
     //Включает постобработку
     post_proc: true,
     
+    //Полноэкранный режим
+    fullscreen: false,
+    
+    //Разрешение
+    resolution: 0,
+    
+    //Громкость
+    volume: 60,
+    
     //Текущий прогресс в прохождении
     checkpoint: 0,
+    
+    //Включает вывод в консоль отладотчной информации
+    debug: true
 };
 
 //-------------------------------------------------------------------------------------------------
@@ -248,38 +251,26 @@ function FreeSceneMemory( resources ) {
 
 //Функция развертывания/свертывания на весь экран
 function Fullscreen() {
-    let status = null;
-    
     if( !document.fullscreenElement && !document.mozFullScreenElement && !document.webkitFullscreenElement ) {
-        if( document.documentElement.requestFullscreen ) {
-            document.documentElement.requestFullscreen();
-            status = 1;
-        } else if( document.documentElement.mozRequestFullScreen ) {
-            document.documentElement.mozRequestFullScreen();
-            status = 1;
-        } else if( document.documentElement.webkitRequestFullscreen ) {
-            document.documentElement.webkitRequestFullscreen( Element.ALLOW_KEYBOARD_INPUT );
-            status = 1;
+        if( config.fullscreen ) {
+            if( document.documentElement.requestFullscreen ) {
+                document.documentElement.requestFullscreen();
+            } else if( document.documentElement.mozRequestFullScreen ) {
+                document.documentElement.mozRequestFullScreen();
+            } else if( document.documentElement.webkitRequestFullscreen ) {
+                document.documentElement.webkitRequestFullscreen( Element.ALLOW_KEYBOARD_INPUT );
+            }
         }
-    } else {
+    } else if( !config.fullscreen ) {
         if( document.exitFullscreen ) {
             document.exitFullscreen();
-            status = 0;
         } else if( document.cancelFullScreen ) {
             document.cancelFullScreen();
-            status = 0;
         } else if( document.mozCancelFullScreen ) {
             document.mozCancelFullScreen();
-            status = 0;
         } else if( document.webkitCancelFullScreen ) {
             document.webkitCancelFullScreen();
-            status = 0;
         }
-    }
-    
-    if( status !== null ) {
-        config.fullscreen = ( status === 0 ? false : true );
-        localStorage.setItem( 'fullscreen', config.fullscreen );
     }
     
     if( config.debug ) console.log( '[Fullscreen] ' + config.fullscreen );
@@ -345,27 +336,75 @@ function DrawScene() {
             let user_width = Math.max( window.innerWidth, window.innerHeight );
             let user_height = Math.min( window.innerWidth, window.innerHeight );
             
-            //Рассчитываем масштабирование канваса по ширине
-            game.canvas.scale = user_width / game.canvas.width;
-            
-            //Разрешение не более 1920х1980
-            if( game.canvas.scale > 3.0 ) game.canvas.scale = 3.0;
-            
-            //Растягиваем канвас средствами css
-            game.canvas.id.style.transform = 'scale( '+ game.canvas.scale +' )';
-            
             //Проверяем корректность ориентации экрана
             game.canvas.rotate = ( window.innerHeight > window.innerWidth ? true : false );
             if( game.canvas.rotate ) {
+                game.canvas.id.width = window.innerWidth - 20;
+                game.canvas.id.height = window.innerHeight - 20;
                 game.canvas.id.style.top = '0';
-                game.canvas.id.style.left = '-50%';
-                game.canvas.id.style.right = '-50%';
                 game.canvas.id.style.transformOrigin = 'center';
+                game.canvas.id.style.transform = 'scale( 1 )';
             } else {
-                game.canvas.id.style.left = '0';
-                game.canvas.id.style.right = '0';
-                if( window.innerHeight - ( game.canvas.scale * game.canvas.height ) > 10 ) {
-                    //Места дофига сверху, центрируем канвас
+                //Сбрасываем размеры холста
+                game.canvas.id.width = game.canvas.width;
+                game.canvas.id.height = game.canvas.height;
+                
+                //Определяем, не нужно ли вернуть масштаб назад
+                if( parseInt( localStorage.getItem( 'resolution' ) )  >  config.resolution ) {
+                    if( 
+                        ( config.resolution + 1 ) * ( game.canvas.height - ( game.canvas.height / 100) * 29 )  <= user_height &&
+                        ( config.resolution + 1 ) * ( game.canvas.width -  ( game.canvas.width  / 100) * 9  )  <= user_width 
+                    ) {
+                        //Увеличиваем разрешение на один пункт
+                        config.resolution++;
+                        game.canvas.resize = true;
+                    }
+                }
+                
+                if( config.resolution === 0 ) {
+                    //Автоматическое масштабирование по ширине
+                    game.canvas.scale = user_width / game.canvas.width;
+                    if( game.canvas.scale > 3.0 ) game.canvas.scale = 3.0;
+                    
+                    //Определяем, не скрылось ли много по высоте ( 30% )
+                    if ( game.canvas.height - user_height / game.canvas.scale > ( game.canvas.height / 100) * 30 ) {
+                        //Автоматическое масштабирование по высоте
+                        game.canvas.scale = user_height / game.canvas.height;
+                    }
+                } else {
+                    //Пользовательское разрешение
+                    game.canvas.scale = config.resolution;
+                    
+                    //Определяем, не скрылось ли много по ширине ( 10% )
+                    if ( game.canvas.width - user_width / game.canvas.scale > ( game.canvas.width / 100) * 10 ) {
+                        //Приводим к ширине масштаб
+                        game.canvas.scale = user_width / game.canvas.width;
+                        if( game.canvas.scale > 3.0 ) game.canvas.scale = 3.0;
+                        
+                        //Определяем, не скрылось ли много по высоте ( 30% )
+                        if ( game.canvas.height - user_height / game.canvas.scale > ( game.canvas.height / 100) * 30 ) {
+                            //Уменьшаем разрешение на один пункт
+                            config.resolution--;
+                            game.canvas.resize = true;
+                        }
+                    //Определяем, не скрылось ли много по высоте ( 30% )
+                    } else if ( game.canvas.height - user_height / game.canvas.scale > ( game.canvas.height / 100) * 30 ) {
+                        //Приводим к высоте масштаб
+                        game.canvas.scale = user_height / game.canvas.height;
+                        if( game.canvas.scale < 1.0 ) {
+                            //Уменьшаем разрешение на один пункт
+                            config.resolution--;
+                            game.canvas.resize = true;
+                        }
+                    }
+                }
+                
+                //Масштабируем канвас средствами css
+                game.canvas.id.style.transform = 'scale( '+ game.canvas.scale +' )';
+                
+                //Провеяем центровку
+                if( user_height - ( game.canvas.scale * game.canvas.height ) > 0 ) {
+                    //Сверху есть место, центрируем канвас по вертикали
                     game.canvas.id.style.top = '0';
                     game.canvas.id.style.transformOrigin = 'center';
                 } else {
@@ -450,6 +489,18 @@ function GameInit() {
         return;
     }
     
+    //Добавляем свои методы для удобной работы со слоями отрисовки
+    Array.prototype.add = function( val ) {
+        if( typeof val === 'string' ) this.push( val );
+    }
+    
+    Array.prototype.del = function( val ) {
+        if( typeof val === 'string' ) {
+            let val_pos = this.indexOf( val );
+            if( val_pos > -1 ) this.splice( val_pos, 1 );
+        }
+    }
+    
     //---------------------------------------------------------------------------------------------
     //localStorage --------------------------------------------------------------------------------
     //---------------------------------------------------------------------------------------------
@@ -518,16 +569,6 @@ function GameInit() {
     //Сообщаем игре, что изменились размеры окна
     window.addEventListener( 'resize', function() {
         game.canvas.resize = true;
-    }, false );
-    
-    //Сообщаем игре, что  изменился полноэкранный режим
-    document.addEventListener( 'fullscreenchange', function( e ) {
-        if ( !!document.fullscreenElement || !!document.mozFullScreenElement || !!document.webkitFullscreenElement ) {
-            config.fullscreen = true;
-        } else {
-            config.fullscreen = false;
-        }
-        localStorage.setItem( 'fullscreen', config.fullscreen );
     }, false );
     
     //---------------------------------------------------------------------------------------------

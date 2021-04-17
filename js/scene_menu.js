@@ -6,6 +6,7 @@ scenes.menu = {
         rain:           { type: 'image', src: '/res/postproc/rain.png?v=0.1' },
         menu_btn:       { type: 'image', src: '/res/menu/btn.png?v=0.1' },
         settings:       { type: 'image', src: '/res/menu/settings.png?v=0.1' },
+        warning:        { type: 'image', src: '/res/menu/warning.png?v=0.1' },
         auto:           { type: 'image', src: '/res/final/auto.png?v=0.1' },
         dorogi:         { type: 'image', src: '/res/final/dorogi.png?v=0.1' },
         krisha:         { type: 'image', src: '/res/final/krisha.png?v=0.1' },
@@ -21,7 +22,9 @@ scenes.menu = {
     
     //Объекты сцены -------------------------------------------------------------------------------
     objects: {
-        //Дисклеймер (для получения клика на запуск звука)
+        //-----------------------------------------------------------------------------------------
+        //Дисклеймер (для получения клика на запуск звука и полгого экрана) -----------------------
+        //-----------------------------------------------------------------------------------------
         disclaimer: {
             //Добавляем объект на сцену
             add: function() {
@@ -38,7 +41,7 @@ scenes.menu = {
                 tmp.menu.disclaimer.compress = 0;
                 
                 //Включаем отрисовку объекта
-                scenes.menu.layers.push( 'disclaimer' );
+                scenes.menu.layers.add( 'disclaimer' );
             },
             
             //Обновляем
@@ -62,9 +65,7 @@ scenes.menu = {
                     //Нажали на Ок
                     if( pos_x > 250 && pos_x < 390 && pos_y > 300 && pos_y < 350 ) {
                         //Запускаем на весь экран
-                        if( config.fullscreen && !document.fullscreenElement && !document.mozFullScreenElement && !document.webkitFullscreenElement ) {
-                            Fullscreen();
-                        }
+                        if( config.fullscreen ) Fullscreen();
                         
                         //Удаляем чейнджлог со сцены
                         scenes.menu.objects.disclaimer.del();
@@ -89,8 +90,7 @@ scenes.menu = {
                 if( config.debug ) console.log( '[menu.disclaimer] del' );
                 
                 //Удаляем из списка на отрисовку
-                let obj_pos = scenes.menu.layers.indexOf( 'disclaimer' );
-                if( obj_pos > -1 ) scenes.menu.layers.splice( obj_pos, 1 );
+                scenes.menu.layers.del( 'disclaimer' );
                 
                 //Добавляем главное меню на сцену
                 scenes.menu.objects.main.add();
@@ -100,7 +100,9 @@ scenes.menu = {
             }
         },
         
-        //Окно настроек
+        //-----------------------------------------------------------------------------------------
+        //Окно настроек ---------------------------------------------------------------------------
+        //-----------------------------------------------------------------------------------------
         settings: {
             //Добавляем объект на сцену
             add: function() {
@@ -112,162 +114,156 @@ scenes.menu = {
                 //Сохраняем координаты мыши
                 tmp.menu.settings.pos_x = game.cursor.pos_x;
                 tmp.menu.settings.pos_y = game.cursor.pos_y;
-                tmp.menu.settings.click_x = game.cursor.click_x;
-                tmp.menu.settings.click_y = game.cursor.click_y;
+                
+                //Координаты окна настроек
+                tmp.menu.settings.x = 180;
+                tmp.menu.settings.y = 110;
+                
+                //Пункты настроек
+                tmp.menu.settings.select = 0;
                 
                 //Включаем отрисовку объекта
-                scenes.menu.layers.push( 'settings' );
+                scenes.menu.layers.add( 'settings' );
             },
             
             //Обновляем
             update: function() {
                 //Получаем короткие ссылки
                 let tmp_set = tmp.menu.settings;
+                let win_x = tmp.menu.settings.x;
+                let win_y = tmp.menu.settings.y;
                 
-                //Клик
-                if( tmp_set.click_x !== game.cursor.click_x || tmp_set.click_y !== game.cursor.click_y ) {
+                
+                //Захват клика
+                let click = false;
+                let pos_x = 0, pos_y = 0;
+                if( game.cursor.pos_x === game.cursor.click_x  &&  game.cursor.pos_y === game.cursor.click_y ) {
                     //Преобразуем в кординаты холста
-                    let click_x = Math.ceil( game.cursor.click_x / game.canvas.scale );
-                    let click_y = Math.ceil( game.cursor.click_y / game.canvas.scale );
+                    pos_x = Math.ceil( game.cursor.pos_x / game.canvas.scale );
+                    pos_y = Math.ceil( game.cursor.pos_y / game.canvas.scale );
                     
-                    //Пункты настроек
-                    if( click_x > 400 && click_x < 460 && click_y > 80 && click_y < 110 ) {
-                        //"Закрыть"
-                        if( tmp.menu.settings !== undefined ) scenes.menu.objects.settings.del();
-                    } else if( click_x > 200 && click_x < 450) {
-                        if ( click_y > 120 && click_y < 150 ) {
-                            //"Ограничить FPS"
-                            switch( config.fps_max ) {
-                                case 30:
-                                    config.fps_max = 40;
-                                    break;
-                                case 40:
-                                    config.fps_max = 50;
-                                    break;
-                                case 50:
-                                    config.fps_max = 60;
-                                    break;
-                                case 60:
-                                    config.fps_max = 30;
-                                    break;
-                                case 60:
-                                default:
-                                    config.fps_max = 30;
-                                    break;
-                            }
-                            localStorage.setItem( 'fps_max', config.fps_max );
-                        } else if ( click_y > 150 && click_y < 178 ) {
-                            //"Показывать FPS"
-                            config.fps_show = ( config.fps_show ? false : true );
-                            localStorage.setItem( 'fps_show', config.fps_show );
-                        } else if ( click_y > 178 && click_y < 208 ) {
-                            //"Постобработка"
-                            config.post_proc = ( config.post_proc ? false : true );
-                            localStorage.setItem( 'post_proc', config.post_proc );
-                        } else if ( click_y > 208 && click_y < 237 ) {
-                            //"На весь экран"
-                            Fullscreen();
-                        } else if ( click_y > 237 && click_y < 265 ) {
-                            //"Громкость"
-                            switch( config.volume ) {
-                                case 30:
-                                    config.volume = 60;
-                                    break;
-                                case 60:
-                                    config.volume = 100;
-                                    break;
-                                case 100:
-                                    config.volume = 150;
-                                    break;
-                                case 150:
-                                default:
-                                    config.volume = 30;
-                                    break;
-                            }
-                            localStorage.setItem( 'volume', config.volume );
-                        }
+                    //Детектируем клик по форме
+                    if( pos_x > win_x && pos_x <  win_x + 283 && pos_y > win_y && win_y <  win_y + 225 ) {
+                        click = true;
+                        
+                        //Клик захвачен, зануляем коордианты
+                        game.cursor.click_x = 0;
+                        game.cursor.click_y = 0;
                     }
-                    
-                    //Обнуляем координаты клика (чтоб отличать нажатия)
-                    tmp_set.click_x = game.cursor.click_x = 0;
-                    tmp_set.click_y = game.cursor.click_y = 0;
                 }
                 
-                //Движение мыши
-                if( tmp_set.pos_x !== game.cursor.pos_x || tmp_set.pos_y !== game.cursor.pos_y ) {
+                //Обрабатываем события мыши
+                if( tmp_set.pos_x !== game.cursor.pos_x || tmp_set.pos_y !== game.cursor.pos_y || click ) {
+                    //Преобразуем в кординаты холста
+                    if( !click ) {
+                        pos_x = Math.ceil( game.cursor.pos_x / game.canvas.scale );
+                        pos_y = Math.ceil( game.cursor.pos_y / game.canvas.scale );
+                    }
+                    
                     //Сохраняем координаты мыши
                     tmp_set.pos_x = game.cursor.pos_x;
                     tmp_set.pos_y = game.cursor.pos_y;
                     
-                    //Преобразуем в кординаты холста
-                    let pos_x = Math.ceil( tmp_set.pos_x / game.canvas.scale );
-                    let pos_y = Math.ceil( tmp_set.pos_y / game.canvas.scale );
-                    
-                    //Пункты меню
-                    /*if( pos_x > 15 && pos_x < 140 && pos_y > 275 && pos_y < 290 ) {
-                        //"Новая игра"
-                        tmp_main.select = 1;
-                    } else if( config.checkpoint > 0 && pos_x > 15 && pos_x < 160 && pos_y > 300 && pos_y < 315 ) {
-                        //"Продолжить"
-                        tmp_main.select = 2;
-                    } else if( pos_x > 15 && pos_x < 140 && pos_y > 325 && pos_y < 340 ) {
-                        //"Настройки"
-                        tmp_main.select = 3;
-                    } else {
-                        tmp_main.select = 0;
-                    }*/
+                    //Детектируем движение на форме
+                    if( pos_x > win_x && pos_x <  win_x + 283 && pos_y > win_y && win_y <  win_y + 225 ) {
+                        //Пункты настроек
+                        tmp_set.select = 0;
+                        if( click && pos_x > win_x + 230 && pos_x < win_x + 270 && pos_y > win_y + 2 && pos_y < win_y + 22 ) {
+                            //"Закрыть"
+                            if( tmp.menu.settings !== undefined ) scenes.menu.objects.settings.del();
+                        } else if( pos_x > win_x + 20 && pos_x < win_x + 270) {
+                            if ( pos_y > win_y + 40 && pos_y < win_y + 67 ) {
+                                //"Ограничить FPS"
+                                tmp_set.select = 1;
+                                if( click ) {
+                                    config.fps_max = ( config.fps_max >= 60 ? 30 : config.fps_max + 10 );
+                                    localStorage.setItem( 'fps_max', config.fps_max );
+                                }
+                            } else if ( pos_y > win_y + 67 && pos_y < win_y + 98 ) {
+                                //"Показывать FPS"
+                                tmp_set.select = 2;
+                                if( click ) {
+                                    config.fps_show = !config.fps_show;
+                                    localStorage.setItem( 'fps_show', config.fps_show );
+                                }
+                            } else if ( pos_y > win_y + 98 && pos_y < win_y + 126 ) {
+                                //"Постобработка"
+                                tmp_set.select = 3;
+                                if( click ) {
+                                    config.post_proc = !config.post_proc;
+                                    localStorage.setItem( 'post_proc', config.post_proc );
+                                }
+                            } else if ( pos_y > win_y + 126 && pos_y < win_y + 154 ) {
+                                //"Во весь экран"
+                                tmp_set.select = 4;
+                                if( click ) {
+                                    config.fullscreen = !config.fullscreen;
+                                    localStorage.setItem( 'fullscreen', config.fullscreen );
+                                    Fullscreen();
+                                }
+                            } else if ( pos_y > win_y + 154 && pos_y < win_y + 184 ) {
+                                //"Разрешение"
+                                tmp_set.select = 5;
+                                if( click ) {
+                                    config.resolution = ( config.resolution >= 3 ? 0 : config.resolution + 1 );
+                                    game.canvas.resize = true;
+                                    localStorage.setItem( 'resolution', config.resolution );
+                                }
+                            } else if ( pos_y > win_y + 184 && pos_y < win_y + 214 ) {
+                                //"Громкость"
+                                tmp_set.select = 6;
+                                if( click ) {
+                                    config.volume = ( config.volume >= 120 ? 30 : config.volume + 30 );
+                                    localStorage.setItem( 'volume', config.volume );
+                                }
+                            }
+                        }
+                    }
                 }
             },
             
             //Отрисовываем
             draw: function() {
-                let tmp_var = 0;
-                game.canvas.context.drawImage( scenes.menu.resources.settings.data, 0, 0, 285, 201, 178, 80, 285, 201 );
+                let img = scenes.menu.resources.settings.data;
+                let select = tmp.menu.settings.select;
+                let win_x = tmp.menu.settings.x, win_y = tmp.menu.settings.y;
+                game.canvas.context.drawImage( img, 0, 0, 283, 225, win_x, win_y, 283, 225 );
                 
                 //"Ограничить FPS"
-                switch( config.fps_max ) {
-                    case 30:
-                    default:
-                        tmp_var = 0;
-                        break;
-                    case 40:
-                        tmp_var = 1;
-                        break;
-                    case 50:
-                        tmp_var = 2;
-                        break;
-                    case 60:
-                        tmp_var = 3;
-                        break;
-                }
-                if( tmp_var > 0) game.canvas.context.drawImage( scenes.menu.resources.settings.data, 255 + tmp_var*30, 0, 30, 22, 385, 118, 30, 22 );
+                game.canvas.context.drawImage( img, 
+                    292 + ( select === 1 ? 110 : 0) + Math.floor( config.fps_max / 10 - 3 ) * 24, 0, 24, 15, 
+                    win_x + 213, win_y + 44, 24, 15
+                );
                 
                 //"Показывать FPS"
-                if( config.fps_show ) game.canvas.context.drawImage( scenes.menu.resources.settings.data, 286, 23, 68, 23, 388, 150, 68, 23 );
+                game.canvas.context.drawImage( img, 
+                    292 + ( select === 2 ? 110 : 0) + ( config.fps_show ? 0 : 55 ), 15, 55, 12, 
+                    win_x + 216, win_y + 76, 55, 12
+                );
                 
                 //"Постобработка"
-                if( config.post_proc === false ) game.canvas.context.drawImage( scenes.menu.resources.settings.data, 211, 71, 63, 23, 371, 180, 63, 23 );
+                game.canvas.context.drawImage( img, 
+                    292 + ( select === 3 ? 110 : 0) + ( config.post_proc ? 0 : 55 ), 15, 55, 12, 
+                    win_x + 198, win_y + 105, 55, 12
+                );
                 
                 //"На весь экран"
-                if( config.fullscreen ) game.canvas.context.drawImage( scenes.menu.resources.settings.data, 286, 23, 68, 23, 362, 208, 68, 23 );
+                game.canvas.context.drawImage( img, 
+                    292 + ( select === 4 ? 110 : 0) + ( config.fullscreen ? 0 : 55 ), 15, 55, 12, 
+                    win_x + 191, win_y + 134, 55, 12
+                );
+                
+                //"Разрешение"
+                game.canvas.context.drawImage( img, 
+                    292 + ( select === 5 ? 110 : 0), 91 +  config.resolution * 20, 61, 20, 
+                    win_x + 171, win_y + 160, 61, 20
+                );
                 
                 //"Громкость"
-                switch( config.volume ) {
-                    case 30:
-                        tmp_var = 46;
-                        break;
-                    case 60:
-                    default:
-                        tmp_var = 0;
-                        break;
-                    case 100:
-                        tmp_var = 69;
-                        break;
-                    case 150:
-                        tmp_var = 92;
-                        break;
-                }
-                if( tmp_var > 0) game.canvas.context.drawImage( scenes.menu.resources.settings.data, 286, tmp_var, 96, 22, 323, 237, 96, 22 );
+                game.canvas.context.drawImage( img, 
+                    292 + ( select === 6 ? 110 : 0), 27 +  Math.floor( config.volume / 30 - 1 ) * 16, 81, 16, 
+                    win_x + 148, win_y + 192, 81, 16
+                );
             },
             
             //Удаляем объект со сцены
@@ -275,15 +271,113 @@ scenes.menu = {
                 if( config.debug ) console.log( '[menu.settings] del' );
                 
                 //Удаляем из списка на отрисовку
-                let obj_pos = scenes.menu.layers.indexOf( 'settings' );
-                if( obj_pos > -1 ) scenes.menu.layers.splice( obj_pos, 1 );
+                scenes.menu.layers.del( 'settings' );
                 
                 //Удаляем созданные переменные
                 delete tmp.menu.settings;
             }
         },
+        //-----------------------------------------------------------------------------------------
+        //Окно предупреждения о начале новой игры ----- -------------------------------------------
+        //-----------------------------------------------------------------------------------------
+        warning: {
+            //Добавляем объект на сцену
+            add: function() {
+                if( config.debug ) console.log( '[menu.warning] add' );
+                
+                //Создаем временные переменные
+                tmp.menu.warning = {};
+                
+                //Сохраняем координаты мыши
+                tmp.menu.warning.pos_x = game.cursor.pos_x;
+                tmp.menu.warning.pos_y = game.cursor.pos_y;
+                tmp.menu.warning.click_x = game.cursor.click_x;
+                tmp.menu.warning.click_y = game.cursor.click_y;
+                
+                //Подсветка кнопок
+                tmp.menu.warning.select = 0;
+                
+                //Включаем отрисовку объекта
+                scenes.menu.layers.add( 'warning' );
+            },
+            
+            //Обновляем
+            update: function() {
+                //Получаем короткие ссылки
+                let tmp_war = tmp.menu.warning;
+                
+                //Клик
+                let click_x = tmp_war.click_x;
+                let click_y = tmp_war.click_y;
+                if( click_x !== game.cursor.click_x  &&  click_y !== game.cursor.click_y ) {
+                    //Сохраняем координаты клика
+                    click_x = game.cursor.click_x;
+                    click_y = game.cursor.click_y;
+                    
+                    //Преобразуем в координаты холста
+                    let pos_x = Math.ceil( click_x / game.canvas.scale );
+                    let pos_y = Math.ceil( click_y / game.canvas.scale );
+                    
+                    //Пункты меню
+                    if( pos_x > 185 && pos_x < 295 && pos_y > 235 && pos_y < 270 ) {
+                        //"Ок"
+                        scenes.menu.disable();
+                        return;
+                    } else if( pos_x > 350 && pos_x < 455 && pos_y > 235 && pos_y < 270 ) {
+                        //"Отмена"
+                        scenes.menu.objects.warning.del();
+                    }
+                }
+                
+                //Движение мыши
+                if( tmp_war.pos_x !== game.cursor.pos_x || tmp_war.pos_y !== game.cursor.pos_y ) {
+                    //Сохраняем координаты мыши
+                    tmp_war.pos_x = game.cursor.pos_x;
+                    tmp_war.pos_y = game.cursor.pos_y;
+                    
+                    //Преобразуем в кординаты холста
+                    let pos_x = Math.ceil( tmp_war.pos_x / game.canvas.scale );
+                    let pos_y = Math.ceil( tmp_war.pos_y / game.canvas.scale );
+                    
+                    //Пункты меню
+                    tmp_war.select = 0;
+                    if( pos_x > 185 && pos_x < 295 && pos_y > 235 && pos_y < 270 ) {
+                        //"Ок"
+                        tmp_war.select = 1;
+                    } else if( pos_x > 350 && pos_x < 455 && pos_y > 235 && pos_y < 270 ) {
+                        //"Отмена"
+                        tmp_war.select = 2;
+                    }
+                }
+            },
+            
+            //Отрисовываем
+            draw: function() {
+                game.canvas.context.drawImage( scenes.menu.resources.warning.data, 0, 0, 354, 148, 143, 143, 354, 148 );
+                if( tmp.menu.warning.select > 0) { 
+                    game.canvas.context.drawImage(
+                        scenes.menu.resources.warning.data,
+                        ( tmp.menu.warning.select - 1 ) * 177, 148, 177, 36,
+                        ( tmp.menu.warning.select - 1 ) * 177 + 143, 143 + 91, 177, 36
+                    );
+                }
+            },
+            
+            //Удаляем объект со сцены
+            del: function() {
+                if( config.debug ) console.log( '[menu.warning] del' );
+                
+                //Удаляем из списка на отрисовку
+                scenes.menu.layers.del( 'warning' );
+                
+                //Удаляем созданные переменные
+                delete tmp.menu.warning;
+            }
+        },
         
-        //Главное меню
+        //-----------------------------------------------------------------------------------------
+        //Главное меню ----------------------------------------------------------------------------
+        //-----------------------------------------------------------------------------------------
         main: {
             //Добавляем объект на сцену
             add: function() {
@@ -315,12 +409,11 @@ scenes.menu = {
                 tmp.menu.main.auto = [ [40,0,0], [349,0,1], [20,0,2], [250,0,3] ];
                 tmp.menu.main.auto_ts = tmp.update_ts;
                 
-                //Пункты меню
+                //Подсветка пунктов меню
                 tmp.menu.main.select = 0;
-                tmp.menu.main.selected = 0;
                 
                 //Включаем отрисовку объекта
-                scenes.menu.layers.push( 'main' );
+                scenes.menu.layers.add( 'main' );
             },
             
             //Обновляем
@@ -339,7 +432,17 @@ scenes.menu = {
                     let click_y = Math.ceil( tmp_main.click_y / game.canvas.scale );
                     
                     //Пункты меню
-                    if( click_x > 15 && click_x < 140 && click_y > 325 && click_y < 340 ) {
+                    if( click_x > 15 && click_x < 140 && click_y > 275 && click_y < 290 ) {
+                        //"Новая игра"
+                        if( config.checkpoint > 0 ) {
+                            //Выводим предупреждение о сгорании прогресса
+                            if( tmp.menu.warning === undefined ) scenes.menu.objects.warning.add();
+                        } else {
+                            //Завершаем текущую сцену
+                            scenes.menu.disable();
+                            return;
+                        }
+                    } else if( click_x > 15 && click_x < 140 && click_y > 325 && click_y < 340 ) {
                         //"Настройки"
                         if( tmp.menu.settings === undefined ) scenes.menu.objects.settings.add();
                     }
@@ -357,6 +460,7 @@ scenes.menu = {
                     
                     //Пункты меню
                     if( tmp.menu.settings === undefined ) {
+                        tmp_main.select = 0;
                         if( pos_x > 15 && pos_x < 140 && pos_y > 275 && pos_y < 290 ) {
                             //"Новая игра"
                             tmp_main.select = 1;
@@ -366,8 +470,6 @@ scenes.menu = {
                         } else if( pos_x > 15 && pos_x < 140 && pos_y > 325 && pos_y < 340 ) {
                             //"Настройки"
                             tmp_main.select = 3;
-                        } else {
-                            tmp_main.select = 0;
                         }
                     }
                 }
@@ -439,8 +541,7 @@ scenes.menu = {
                 if( config.debug ) console.log( '[menu.main] del' );
                 
                 //Прекращаем отрисовку объекта
-                let obj_pos = scenes.menu.layers.indexOf( 'main' );
-                if( obj_pos > -1 ) scenes.menu.layers.splice( obj_pos, 1 );
+                scenes.menu.layers.del( 'main' );
                 
                 //Выключаем фоновый звук
                 scenes.menu.resources.sound_bg.stop();
@@ -454,7 +555,9 @@ scenes.menu = {
         }
     },
     
+    //---------------------------------------------------------------------------------------------
     //Создание сцены ------------------------------------------------------------------------------
+    //---------------------------------------------------------------------------------------------
     enable: function() {
         if( config.debug ) console.log( '[menu] scene enable' );
         //Создаем временные переменные для сцены
@@ -473,14 +576,25 @@ scenes.menu = {
         } );
     },
     
+    //---------------------------------------------------------------------------------------------
     //Выгрузка сцены из памяти --------------------------------------------------------------------
+    //---------------------------------------------------------------------------------------------
     disable: function() {
         //Выключаем сцену
         game.scene = scenes.empty;
         
+        //Удаляем окошко предупреждения
+        if( tmp.menu.warning !== undefined) scenes.menu.objects.warning.del();
+        
+        //Удаляем меню со сцены
+        scenes.menu.objects.main.del();
+        
         //Выгружаем ресурсы сцены из опративной памяти
         FreeSceneMemory( scenes.menu.resources );
         
-        if( config.debug ) console.log( '[preloader] menu disable' );
+        //Удаляем созданные переменные
+        delete tmp.menu;
+        
+        if( config.debug ) console.log( '[menu] scene disable' );
     }
 };

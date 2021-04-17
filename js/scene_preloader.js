@@ -66,7 +66,7 @@ scenes.preloader = {
                 if( config.debug ) console.log( '[preloader.pogressbar] add' );
                 
                 //Включаем отрисовку объекта
-                scenes.preloader.layers.push( 'progressbar' );
+                scenes.preloader.layers.add( 'progressbar' );
                 
                 //Инициалищируем переменные
                 tmp.preloader.progressbar = {};
@@ -135,10 +135,10 @@ scenes.preloader = {
             
             //Удаляем объект со сцены
             del: function() {
-                //Удаляем из списка на отрисовку
                 if( config.debug ) console.log( '[preloader.pogressbar] del' );
-                let obj_pos = scenes.preloader.layers.indexOf( 'progressbar' );
-                if( obj_pos > -1 ) scenes.preloader.layers.splice( obj_pos, 1 );
+                
+                //Удаляем из списка на отрисовку
+                scenes.preloader.layers.del( 'progressbar' );
                 
                 //Удаляем временные переменные
                 delete tmp.preloader.progressbar;
