@@ -115,10 +115,7 @@ var game = {
     fps: 0
 };
 
-var tmp = {
-    loading: [ 1, 4,  1, 9,  1, 14,  0, 20 ],
-    fps_max: config.fps_max
-};
+var tmp = {};
 //-------------------------------------------------------------------------------------------------
 
 //Загрузка ресурсов сцены в оперативную память
@@ -328,7 +325,7 @@ function DrawScene() {
         }
         
         //Изменение размеров окна (не чаще 2-х раз в сек.)
-        if( game.canvas.resize && ( draw_ts - tmp.resize_ts > 500.0 ) ) {
+        if( game.canvas.resize && ( draw_ts - tmp.resize_start_ts > 250.0 ) && ( draw_ts - tmp.resize_ts > 500.0 ) ) {
             game.canvas.resize = false;
             tmp.resize_ts = draw_ts;
             
@@ -344,6 +341,9 @@ function DrawScene() {
                 game.canvas.id.style.top = '0';
                 game.canvas.id.style.transformOrigin = 'center';
                 game.canvas.id.style.transform = 'scale( 1 )';
+                
+                //Фикс для мобил, задержка изменения фактических размеров экрана 3 сек.
+                if( draw_ts - tmp.resize_start_ts < 3000.0 ) game.canvas.resize = true;
             } else {
                 //Сбрасываем размеры холста
                 game.canvas.id.width = game.canvas.width;
@@ -436,43 +436,49 @@ function DrawScene() {
             if( config.post_proc ) {
                 game.postproc();
             }
+            
+            //Отображение частоты кадров
+            if( config.fps_show ) {
+                context.fillStyle = '#ababab';
+                context.font = 'normal 8pt Arial';
+                context.fillText( 'FPS: ' + game.fps, 598, 356 );
+            }
         } else {
             //Рисуем значок поворота экрана мобилы в горизонталь
-            let x_pos = Math.ceil( game.canvas.width / 2 );
-            let y_pos = Math.ceil( game.canvas.height / 2 );
+            let x_pos = Math.ceil( game.canvas.id.width / 2 );
+            let y_pos = Math.ceil( game.canvas.id.height / 2 );
+            let scale = Math.ceil( x_pos / 100 );
+            let icon = tmp.rotate_icon;
+            
             context.strokeStyle = '#FFFFFF';
             context.lineWidth = 4;
             context.lineCap = 'round';
+            
             context.beginPath();
-            context.moveTo( x_pos - (50-3), y_pos + (66-50)  );
-            context.lineTo( x_pos + (61-50), y_pos - (50-6) );
-            context.lineTo( x_pos + (93-50), y_pos - (50-39) );
-            context.lineTo( x_pos - (50-35), y_pos + (97-50) );
-            context.lineTo( x_pos - (50-3), y_pos + (66-50) );
+                context.moveTo( x_pos - scale * 47, y_pos + scale * 16 );
+                context.lineTo( x_pos + scale * 11, y_pos - scale * 44 );
+                context.lineTo( x_pos + scale * 43, y_pos - scale * 11 );
+                context.lineTo( x_pos - scale * 15, y_pos + scale * 47 );
+            context.closePath();
             context.stroke();
-            context.moveTo( x_pos - (50-14), y_pos + (55-50)  );
-            context.lineTo( x_pos - (50-46), y_pos + (86-50) );
+            
+            context.beginPath();
+                context.moveTo( x_pos - scale * 36, y_pos + scale * 5 );
+                context.lineTo( x_pos - scale * 4,  y_pos + scale * 36 );
             context.stroke();
-            context.moveTo( x_pos - (50-23), y_pos + (74-50)  );
-            context.lineTo( x_pos - (50-26), y_pos + (77-50) );
+                context.moveTo( x_pos - scale * 27, y_pos + scale * 24 );
+                context.lineTo( x_pos - scale * 24, y_pos + scale * 27 );
             context.stroke();
-            context.moveTo( x_pos - (50-2), y_pos - (50-28)  );
-            context.lineTo( x_pos - (50-16), y_pos - (50-14)  );
-            context.lineTo( x_pos - (50-38), y_pos - (50-14)  );
+                context.moveTo( x_pos - scale * 48, y_pos - scale * 22 );
+                context.lineTo( x_pos - scale * 34, y_pos - scale * 36 );
+                context.lineTo( x_pos - scale * 12, y_pos - scale * 36 );
             context.stroke();
-            context.moveTo( x_pos - (50-38), y_pos - (50-14)  );
-            context.lineTo( x_pos - (50-30), y_pos - (50-6)  );
+                context.moveTo( x_pos - scale * 12, y_pos - scale * 36 );
+                context.lineTo( x_pos - scale * 20, y_pos - scale * 44 );
             context.stroke();
-            context.moveTo( x_pos - (50-38), y_pos - (50-14)  );
-            context.lineTo( x_pos - (50-30), y_pos - (50-23)  );
+                context.moveTo( x_pos - scale * 12, y_pos - scale * 36 );
+                context.lineTo( x_pos - scale * 20, y_pos - scale * 27 );
             context.stroke();
-        }
-        
-        //Отображение частоты кадров
-        if( config.fps_show ) {
-            context.fillStyle = '#ababab';
-            context.font = 'normal 8pt Arial';
-            context.fillText( 'FPS: ' + game.fps, 598, 356 );
         }
     }
     
@@ -568,6 +574,7 @@ function GameInit() {
     
     //Сообщаем игре, что изменились размеры окна
     window.addEventListener( 'resize', function() {
+        tmp.resize_start_ts = performance.now();
         game.canvas.resize = true;
     }, false );
     
@@ -608,6 +615,7 @@ function GameInit() {
     //Инициализируем временные переменные
     tmp.volume = config.volume;
     tmp.fps_max = config.fps_max;
+    tmp.resize_start_ts = 0.0;
     tmp.resize_ts = 0.0;
     tmp.update_ts = 0.0;
     tmp.draw_ts = 0.0;
@@ -615,6 +623,7 @@ function GameInit() {
         frames: 0,
         prev_ts: 0.0
     };
+    tmp.loading = [ 1, 4,  1, 9,  1, 14,  0, 20 ];
     
     //---------------------------------------------------------------------------------------------
     //Запускаем сцену загрузки ресурсов -----------------------------------------------------------

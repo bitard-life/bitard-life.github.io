@@ -47,8 +47,8 @@ scenes.menu = {
             //Обновляем
             update: function() {
                 //Сжатие дисклеймера
-                let diff = game.canvas.scale * game.canvas.height - window.innerHeight;
-                tmp.menu.disclaimer.compress = ( diff > 40 ? Math.floor( diff / 3 ) : 0 );
+                let diff = game.canvas.height - window.innerHeight / game.canvas.scale;
+                tmp.menu.disclaimer.compress = ( diff > 26 ? Math.floor( diff - 26 ) : 0 );
                 
                 //Кликнули
                 let click_x = tmp.menu.disclaimer.click_x;
@@ -79,9 +79,9 @@ scenes.menu = {
                 if( tmp.menu.disclaimer.compress === 0 ) {
                     game.canvas.context.drawImage( scenes.menu.resources.disclaimer.data, 0, 0 );
                 } else {
-                    game.canvas.context.drawImage( scenes.menu.resources.disclaimer.data, 170, 20, 300, 50, 170, 20 + tmp.menu.disclaimer.compress, 300, 50 );
-                    game.canvas.context.drawImage( scenes.menu.resources.disclaimer.data, 22, 106, 594, 152, 22, 106 + Math.floor( tmp.menu.disclaimer.compress / 2), 594, 152 );
-                    game.canvas.context.drawImage( scenes.menu.resources.disclaimer.data, 250, 300, 140, 40, 250, 300, 140, 40 );
+                    game.canvas.context.drawImage( scenes.menu.resources.disclaimer.data, 0, 20,  640, 50,   0, 20 + tmp.menu.disclaimer.compress, 640, 50 );
+                    game.canvas.context.drawImage( scenes.menu.resources.disclaimer.data, 0, 106, 640, 152,  0, 106 + Math.floor( tmp.menu.disclaimer.compress / 2), 640, 152 );
+                    game.canvas.context.drawImage( scenes.menu.resources.disclaimer.data, 0, 300, 640, 40,   0, 300, 640, 40 );
                 }
             },
             
