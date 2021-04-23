@@ -44,9 +44,8 @@ var scenes = {
                 draw: function() {
                     let context = game.canvas.context;
                     let iter = tmp.loading;
-                    let over =  Math.ceil( ( game.canvas.height - ( window.innerHeight / game.canvas.scale ) ) / 2 );
                     let x = Math.ceil( game.canvas.width  / 2 ) - 40;
-                    let y = Math.ceil( game.canvas.height / 2 ) - 10 + over;
+                    let y = Math.ceil( ( game.canvas.height + game.canvas.hidden_h ) / 2 ) - 10;
                     
                     context.clearRect( 0, 0, game.canvas.width, game.canvas.height );
                     context.fillStyle = '#bcbcbc';
@@ -76,9 +75,21 @@ var game = {
         width: 0,
         height: 0,
         scale: 1.0,
+        hidden_h: 0,
         rotate: false,
         resize: true
     },
+    
+    //Доп. холст для пиксельных манипуляций
+    temp_canvas: {
+        id: null,
+        context: null,
+        width: 150,
+        height: 150
+    },
+    
+    //Текущее значение fps
+    fps: 0,
     
     //Интервал обновления в миллисекундах
     delay: Math.ceil( 1000.0 / config.fps_max ),
@@ -89,164 +100,46 @@ var game = {
     //Функция постобработки кадра (заменяется при смене эффекта)
     postproc: function() { return; },
     
+    //Флаг мобильного устройства
+    is_mobile: false,
+    
     //Звук
     audio: {
+        mp3_support: false,
         enabled: false,
         context: null,
         gain: null
     },
     
-    //Флаг поддержки воспроизведения mp3 файлов
-    mp3_sound: false,
-    
-    //Флаг мобильного устройства
-    is_mobile: false,
-    
-    //Переменные для работы с курсором в игре
+    //Переменные для работы с курсором
     cursor: {
         pos_x: 0,
         pos_y: 0,
         click_x: 0,
         click_y: 0,
+        wheel: 0,
         pressed: false
     },
     
-    //Текущее значение fps
-    fps: 0
+    //Переменные для работы с клавиатурой
+    keyboard: {
+        tab: 0,
+        plus: 0,
+        minus: 0,
+        up: 0,
+        down: 0,
+        left: 0,
+        right: 0
+    }
 };
 
 var tmp = {};
+
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 
-//Загрузка ресурсов сцены в оперативную память
-function LoadSceneMemory( resources, callback ) {
-    //Перебираем ресурсы заявленные для сцены
-    let res_names = Object.getOwnPropertyNames( resources );
-    for( let i = 0, res_count = res_names.length; i < res_count; i++ ) {
-        //Определяем тип ресурса
-        switch( resources[ res_names[ i ] ].type ) {
-            //Файл изображения --------------------------------------------------------------------
-            case 'image':
-                //Создаем Blob структуру из скачанных данных
-                let image_blob = new Blob( [ resources[ res_names[ i ] ].file ] );
-                
-                //Создаем объект изображения
-                let temp_img = new Image;
-                temp_img.res_name = res_names[ i ];
-                temp_img.onload = function() {
-                    //Сохраняем ссылку на изображение
-                    resources[ this.res_name ].data = this;
-                    
-                    //Освобождаем память занятую URL объектом
-                    window.URL.revokeObjectURL( this.src );
-                    
-                    if( config.debug ) console.log( '[LoadSceneMemory] loaded: ' + this.res_name );
-                }
-                
-                //Загружаем в объект изображения нашу Blob структуру с помощью URL метода
-                temp_img.src = window.URL.createObjectURL( image_blob );
-            break;
-            
-            //Файл изображения в формате base64 ---------------------------------------------------
-            case 'image64':
-                //Создаем объект изображения
-                let temp_img64 = new Image;
-                temp_img64.res_name = res_names[ i ];
-                temp_img64.onload = function() {
-                    //Сохраняем ссылку на изображение
-                    resources[ this.res_name ].data = this;
-                    
-                    if( config.debug ) console.log( '[LoadSceneMemory] loaded: ' + this.res_name );
-                }
-                
-                //Загружаем в объект изображения наши base64 данные
-                temp_img64.src = resources[ temp_img64.res_name ].file;
-            break;
-            
-            //Звуковой файл -----------------------------------------------------------------------
-            case 'sound':
-                //Асинхронное декодирование загруженного звукового файла
-                game.audio.context.decodeAudioData(
-                    //ArrayBuffer для декодирования
-                    resources[ res_names[ i ] ].file,
-                    
-                    //Коллбек который вызовется при успешном декодировании
-                    function( decodedAudio ) {
-                        //Сохраняем ссылку на декодированное аудио
-                        resources[ res_names[ i ] ].data = decodedAudio;
-                        
-                        //Создаем интерфейс управления
-                        resources[ res_names[ i ] ].play = function( offset = 0, duration = 0 ) {
-                            //Создаем аудиобуффер
-                            resources[ res_names[ i ] ].source = game.audio.context.createBufferSource();
-                            //Помещаем в него декодированные данные
-                            resources[ res_names[ i ] ].source.buffer = resources[ res_names[ i ] ].data;
-                            //Подключаем аудиобуфер к ноде громкости
-                            resources[ res_names[ i ] ].source.connect( game.audio.gain );
-                            //Зацикливаем аудио, если надо
-                            if( duration == 0 ) resources[ res_names[ i ] ].source.loop = true;
-                            //Запускаем проигрывание
-                            resources[ res_names[ i ] ].source.start( 0, offset );
-                        };
-                        resources[ res_names[ i ] ].stop = function() {
-                            //Останавливаем проигрывание
-                            resources[ res_names[ i ] ].source.stop();  
-                        };
-                    }
-                );
-            break;
-        }
-    }
-    
-    //Ждем завершения загрузки ресурсов в память
-    tmp.timerMemory = setInterval( function() {
-        let res_names = Object.getOwnPropertyNames( resources );
-        let res_count = res_names.length;
-        let res_complete = 0;
-            
-        //Проверяем наличие ресурсов в памяти (поле data заполняется загрузившимся объектом в асинхронной функции)
-        for( let i = 0; i < res_count; i++, res_complete++ ) {
-            if( resources[ res_names[ i ] ].data === undefined ) break;
-        }
-            
-        //Все ресурсы загружены в память
-        if( res_count  === res_complete ) {
-            if( config.debug ) console.log( '[LoadSceneMemory] all resource loaded' );
-            
-            //Удаляем таймер
-            clearInterval( tmp.timerMemory );
-            
-            //Вызываем коллбэк
-            callback();
-        }
-    }, 500 );
-}
-
-//Выгрузка ресурсов сцены из оперативной памяти
-function FreeSceneMemory( resources ) {
-    //Перебираем ресурсы заявленные для сцены
-    let res_names = Object.getOwnPropertyNames( resources );
-    for( let i = 0, res_count = res_names.length; i < res_count; i++ ) {
-        //Определяем тип ресурса
-        switch( resources[ res_names[ i ] ].type ) {
-            //Выгружаем объект изображения из оперативки
-            case 'image':
-            case 'image64':
-                resources[ res_names[ i ] ].data.src = '';
-                resources[ res_names[ i ] ].data = null;
-            break;
-            
-            //Выгружаем объект аудио из оперативки
-            case 'sound':
-                resources[ res_names[ i ] ].data.buffer = null;
-            break;
-        }
-    }
-    
-    if( config.debug ) console.log( '[LoadSceneMemory] free' );
-}
-
-//Функция развертывания/свертывания на весь экран
+//Развертывание/свертывание на весь экран ---------------------------------------------------------
 function Fullscreen() {
     if( !document.fullscreenElement && !document.mozFullScreenElement && !document.webkitFullscreenElement ) {
         if( config.fullscreen ) {
@@ -270,12 +163,360 @@ function Fullscreen() {
         }
     }
     
-    if( config.debug ) console.log( '[Fullscreen] ' + config.fullscreen );
+    if( config.debug ) console.log( 'Fullscreen(); -> ' + config.fullscreen );
 }
 
-//-------------------------------------------------------------------------------------------------
-//Main loops --------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------
+//Загрузка ресурсов с сайта -----------------------------------------------------------------------
+function LoadResources() {
+    //Заполняем список ресурсов к скачиванию
+    //tmp.download.resources = [ { src: '/../xxx.xxx', link: [ { scene: 'scene_name', object: 'object_name', name: 'res_name' }, ... ] }, ... ]
+    
+    //Перебираем сцены
+    let scenes_names = Object.getOwnPropertyNames( scenes );
+    for( let scn = 0; scn < scenes_names.length; scn++ ) {
+        let scene_name = scenes_names[ scn ];
+        let scene = scenes[ scene_name ];
+        
+        //Перебираем объекты сцены
+        let scene_objects_names = Object.getOwnPropertyNames( scene.objects );
+        for( let obj = 0; obj < scene_objects_names.length; obj++ ) {
+            let object_name = scene_objects_names[ obj ];
+            let object = scene.objects[ object_name ];
+            
+            //У объекта нашлись ресурсы на скачивание
+            if( object.resources !== undefined ) {
+                
+                //Перебираем ресурсы и заносим их в список для скачивания
+                let object_res_names = Object.getOwnPropertyNames( object.resources );
+                for( let res = 0; res < object_res_names.length; res++ ) {
+                    let resource_name = object_res_names[ res ];
+                    let resource = object.resources[ resource_name ];
+                        
+                    //Поверяем, вдруг файл уже был загружен
+                    if( resource.file !== undefined ) continue;
+                    
+                    //Для звука переключаем на поддерживаемый формат
+                    if( resource.type == 'sound' ) resource.src = ( game.audio.mp3_support ? resource.mp3 : resource.ogg );
+                    
+                    //Поверяем, есть ли уже в списке на закачку такой ресурс
+                    let res_found = false;
+                    for( let i = 0; i < tmp.download.resources.length; i++ ) {
+                        if( tmp.download.resources[ i ].src === resource.src ) {
+                            //Сохраняем ссылку на ресурс для этой сцены (случай с одним ресурсом на несколько сцен)
+                            tmp.download.resources[ i ].link.push( { scene: scene_name, object: object_name, name: resource_name } );
+                            res_found = true;
+                            break;
+                        }
+                    }
+                    
+                    if( res_found === false ) {
+                        //Добавляем ресурс в список на закачку
+                        tmp.download.resources.push( { src: resource.src, link:[ { scene: scene_name, object: object_name, name: resource_name } ] } );
+                    }
+                }
+            }
+        }
+    }
+    
+    //Количество файлов к скачиванию
+    tmp.download.files_count = tmp.download.resources.length;
+    
+    //Файлов чекнуто через HEAD
+    tmp.download.files_checked = 0;
+    
+    //Файлов загружено
+    tmp.download.files_load = 0;
+    
+    //Общее количество байт на скачивание
+    tmp.download.bytes_all = 0;
+    
+    //Байт скачано
+    tmp.download.bytes_load = 0;
+    
+    //Оцениваем размеры файлов, через http-заголовок HEAD
+    for( let file = 0; file < tmp.download.files_count; file++ ) {
+        let xhr = new XMLHttpRequest();
+        xhr.open( 'HEAD', tmp.download.resources[ file ].src, true );
+        xhr.onreadystatechange = function() {
+            if( this.readyState == this.DONE ) {
+                //Получаем и сохраняем размер файла
+                let file_size = parseInt( xhr.getResponseHeader( 'Content-Length' ) );
+                tmp.download.resources[ file ].size = file_size;
+                
+                //Увеличиваем счетчик общего количества байт для скачивания
+                tmp.download.bytes_all += file_size;
+                
+                //Увеличиваем счетчик чекнутых файлов
+                tmp.download.files_checked++;
+                
+                if( config.debug ) console.log( 'LoadResources(); -> HEAD [ ' + tmp.download.files_checked + '/' + tmp.download.files_count + ' ]: ' + tmp.download.resources[ file ].src );
+            }
+        };
+        xhr.send();
+    }
+    
+    //Ждем завершения оценки размеров файлов
+    tmp.timerHEAD = setInterval( function() {
+        if( tmp.download.files_count  === tmp.download.files_checked ) {
+            clearInterval( tmp.timerHEAD );
+            
+            //Начинаем скачивать файлы ресурсов
+            for( let file = 0; file < tmp.download.files_count; file++ ) {
+                let xhr = new XMLHttpRequest();
+                xhr.open( 'GET', tmp.download.resources[ file ].src, true );
+                xhr.responseType = 'arraybuffer';
+                
+                //Сохраняем в объекте запроса количество скачанных байт
+                xhr.loaded = 0;
+                
+                xhr.onprogress = function( e ) {
+                    //Обновляем общее количество скачанных байт
+                    tmp.download.bytes_load += e.loaded - this.loaded;
+                    this.loaded = e.loaded;
+                };
+                
+                xhr.onload = function( e ) {
+                    //На случай кеширования файлов
+                    tmp.download.bytes_load += tmp.download.resources[ file ].size - this.loaded;
+                    
+                    //Сохраняем массив байт в каждый слинкованый ресурс объекта
+                    for( let link = 0; link < tmp.download.resources[ file ].link.length; link++ ) {
+                        let scene_name = tmp.download.resources[ file ].link[ link ].scene;
+                        let object_name = tmp.download.resources[ file ].link[ link ].object;
+                        let resource_name = tmp.download.resources[ file ].link[ link ].name;
+                        
+                        scenes[ scene_name ].objects[ object_name ].resources[ resource_name ].file = this.response;
+                    }
+                    
+                    //Увеличиваем счетчик загруженных файлов
+                    tmp.download.files_load++;
+                    
+                    if( config.debug ) console.log( 'LoadResources(); -> GET [ ' + tmp.download.files_load + '/' + tmp.download.files_count + ' ]: ' + tmp.download.resources[ file ].src );
+                };
+                
+                xhr.send();
+            }
+        }
+    }, 500 );
+};
+
+//Запуск сцены ------------------------------------------------------------------------------------
+function StartScene( scene_name, func_scene_start ) {
+    let scene = scenes[ scene_name ];
+    if( scene === undefined ) return;
+    
+    
+    let scene_resource_all = 0;
+    let scene_resource_loaded = 0;
+    
+    if( game.scene !== scenes.empty ) {
+        if( config.debug ) console.log( 'StopScene( "' + game.scene.name + '" );' );
+        
+        //Удаляем всё из слоёв отрисовки
+        game.scene.layers.clear();
+        
+        //Выгрузка ресурсов объектов сцены из оперативной памяти
+        let scene_objects = Object.getOwnPropertyNames( game.scene.objects );
+        for( let obj = 0; obj < scene_objects.length; obj++ ) {
+            let object_name = scene_objects[ obj ];
+            let object = game.scene.objects[ object_name ];
+            
+            //Перебираем ресурсы объекта
+            if( object.resources === undefined ) continue;
+            let object_res = Object.getOwnPropertyNames( object.resources );
+            for( let res = 0; res < object_res.length; res++ ) {
+                let resource_name = object_res[ res ];
+                let resource = object.resources[ resource_name ];
+            
+                //Определяем тип ресурса
+                switch( resource.type ) {
+                    //Выгружаем объект изображения из оперативки
+                    case 'image':
+                    case 'image64':
+                        resource.data.src = '';
+                        resource.data = null;
+                    break;
+                    
+                    //Выгружаем объект аудио из оперативки
+                    case 'sound':
+                        if( resource.source !== undefined ) {
+                            resource.source.stop();
+                            resource.source.buffer = null;
+                            resource.source = null;
+                        }
+                        resource.data = null;
+                        resource.play = null;
+                        resource.stop = null;
+                    break;
+                }
+                if( config.debug ) console.log( 'StopScene( "' + game.scene.name + '" ); -> Ресурс "' + resource_name + '" выгружен из памяти.' );
+            }
+        }
+    
+        if( config.debug ) console.log( 'StopScene( "' + game.scene.name + '" ); -> Все ресурсы выгружены из памяти.' );
+        
+        //Включаем сцену "загрузки сцены"
+        game.scene = scenes.loading;
+    }
+    
+    if( config.debug ) console.log( 'StartScene( "' + scene_name + '" );' );
+    
+    
+    
+    //Перебираем объекты сцены
+    let scene_objects = Object.getOwnPropertyNames( scene.objects );
+    for( let obj = 0; obj < scene_objects.length; obj++ ) {
+        let object_name = scene_objects[ obj ];
+        let object = scene.objects[ object_name ];
+        
+        //Добавление объекта на сцену
+        object.add = function() {
+            if( config.debug ) console.log( 'game.scene.add( "' + object_name + '" );' );
+            
+            //На случай импорта из другой сцены
+            if( game.scene.objects[ object_name ] === undefined ) {
+                game.scene.objects[ object_name ] = this;
+            }
+            
+            //Инициализируем объект
+            if( this.init !== undefined ) this.init();
+            
+            //Включаем отрисовку объекта
+            game.scene.layers.push( object_name );
+        };
+        
+        //Удаление объекта со сцены
+        object.del = function() {   
+            let obj_pos = game.scene.layers.indexOf( object_name );
+            if( obj_pos > -1 ) {
+                if( config.debug ) console.log( 'game.scene.del( "' + object_name + '" );' );
+                
+                //Удаляем из списка на отрисовку
+                game.scene.layers.splice( obj_pos, 1 );
+                
+                //Удаляем временные переменные
+                delete this.tmp;
+            }
+        };
+        
+        //Перебираем ресурсы объекта
+        if( object.resources === undefined ) continue;
+        let object_res = Object.getOwnPropertyNames( object.resources );
+        for( let res = 0; res < object_res.length; res++ ) {
+            let resource_name = object_res[ res ];
+            let resource = object.resources[ resource_name ];
+            
+            //Загрузка ресурсов сцены в оперативную память ----------------------------------------
+            switch( resource.type ) {
+                //Файл изображения
+                case 'image':
+                    //Увеличиваем общий счетчик ресурсов
+                    scene_resource_all++;
+                    
+                    //Создаем Blob структуру из скачанных данных
+                    let image_blob = new Blob( [ resource.file ] );
+                    
+                    //Создаем объект изображения
+                    let temp_img = new Image;
+                    temp_img.onload = function() {
+                        if( config.debug ) console.log( 'StartScene( "' + scene_name + '" ); -> Ресурс "' + resource_name + '" загружен в память.' );
+                        
+                        //Сохраняем ссылку на изображение
+                        resource.data = this;
+                        
+                        //Освобождаем память занятую URL объектом
+                        window.URL.revokeObjectURL( this.src );
+                        
+                        //Увеличиваем счетчик загруженных ресурсов
+                        scene_resource_loaded++;
+                    }
+                    
+                    //Загружаем в объект изображения нашу Blob структуру с помощью URL метода
+                    temp_img.src = window.URL.createObjectURL( image_blob );
+                break;
+                
+                //Файл изображения в формате base64
+                case 'image64':
+                    //Увеличиваем общий счетчик ресурсов
+                    scene_resource_all++;
+                    
+                    //Создаем объект изображения
+                    let temp_img64 = new Image;
+                    temp_img64.onload = function() {
+                        if( config.debug ) console.log( 'StartScene( "' + scene_name + '" ); -> Ресурс "' + resource_name + '" загружен в память.' );
+                        
+                        //Сохраняем ссылку на изображение
+                        resource.data = this;
+                        
+                        //Увеличиваем счетчик загруженных ресурсов
+                        scene_resource_loaded++;
+                    }
+                    
+                    //Загружаем в объект изображения наши base64 данные
+                    temp_img64.src = resource.file;
+                break;
+                
+                //Звуковой файл
+                case 'sound':
+                    //Увеличиваем общий счетчик ресурсов
+                    scene_resource_all++;
+                    
+                    //Асинхронное декодирование загруженного звукового файла
+                    game.audio.context.decodeAudioData(
+                        //ArrayBuffer для декодирования
+                        resource.file,
+                        
+                        //Коллбек который вызовется при успешном декодировании
+                        function( decodedAudio ) {
+                            if( config.debug ) console.log( 'StartScene( "' + scene_name + '" ); -> Ресурс "' + resource_name + '" загружен в память.' );
+                            
+                            //Сохраняем ссылку на декодированное аудио
+                            resource.data = decodedAudio;
+                            
+                            //Создаем интерфейс управления
+                            resource.play = function( offset = 0, duration = 0 ) {
+                                //Создаем аудиобуффер
+                                resource.source = game.audio.context.createBufferSource();
+                                //Помещаем в него декодированные данные
+                                resource.source.buffer = resource.data;
+                                //Подключаем аудиобуфер к ноде громкости
+                                resource.source.connect( game.audio.gain );
+                                //Зацикливаем аудио, если надо
+                                if( duration == 0 ) resource.source.loop = true;
+                                //Запускаем проигрывание
+                                resource.source.start( 0, offset );
+                            };
+                            resource.stop = function() {
+                                //Останавливаем проигрывание
+                                resource.source.stop();  
+                            };
+                            
+                            //Увеличиваем счетчик загруженных ресурсов
+                            scene_resource_loaded++;
+                        }
+                    );
+                break;
+            }
+        }
+    }
+    
+    //Ждем завершения загрузки ресурсов в оперативную память
+    tmp.timerLoadScene = setInterval( function() {
+        //Все ресурсы загружены в память
+        if( scene_resource_all === scene_resource_loaded ) {
+            if( config.debug ) console.log( 'StartScene( "' + scene_name + '" ); -> Все ресурсы загружены в память.' );
+            
+            //Удаляем таймер
+            clearInterval( tmp.timerLoadScene );
+            
+            //Запускаем сцену
+            game.scene = scene;
+            
+            //Вызываем коллбэк
+            func_scene_start();
+        }
+    }, 500 );
+};
 
 //Цикл обсчета сцены ------------------------------------------------------------------------------
 function UpdateScene() {
@@ -294,9 +535,12 @@ function UpdateScene() {
         tmp.volume = config.volume;
     }
     
-    //Обновляем объекты сцены
-    for( let i = 0; i < game.scene.layers.length; i++ ) {
-        game.scene.objects[ game.scene.layers[ i ] ].update();
+    //Обновляем объекты сцены( с конца )
+    for( let layer_ind = temp_ind = game.scene.layers.length; layer_ind > 0; layer_ind-- ) {
+        game.scene.objects[ game.scene.layers[ layer_ind - 1 ] ].update();
+        
+        //Изменился список отрисовки
+        if( game.scene.layers.length !== temp_ind  ) break;
     }
     
     //Запускаем очередную итерацию
@@ -402,8 +646,12 @@ function DrawScene() {
                 //Масштабируем канвас средствами css
                 game.canvas.id.style.transform = 'scale( '+ game.canvas.scale +' )';
                 
+                //Проверяем сколько скрыто по высоте
+                game.canvas.hidden_h = Math.floor( game.canvas.height - user_height / game.canvas.scale );
+                game.canvas.hidden_h = ( game.canvas.hidden_h < 0 ? 0 : game.canvas.hidden_h );
+                
                 //Провеяем центровку
-                if( user_height - ( game.canvas.scale * game.canvas.height ) > 0 ) {
+                if( user_height - ( game.canvas.scale * game.canvas.height ) > 1 ) {
                     //Сверху есть место, центрируем канвас по вертикали
                     game.canvas.id.style.top = '0';
                     game.canvas.id.style.transformOrigin = 'center';
@@ -428,14 +676,15 @@ function DrawScene() {
             context.strokeRect( 0, 0, game.canvas.width, game.canvas.height );
             
             //Отрисовка объектов сцены
-            for( let i = 0; i < game.scene.layers.length; i++ ) {
+            for( let i = 0, layers_len = game.scene.layers.length; i < layers_len; i++ ) {
                 game.scene.objects[ game.scene.layers[ i ] ].draw();
+                
+                //Изменился список отрисовки
+                if( layers_len !== game.scene.layers.length ) break;
             }
             
             //Постобработка кадра
-            if( config.post_proc ) {
-                game.postproc();
-            }
+            if( config.post_proc ) game.postproc();
             
             //Отображение частоты кадров
             if( config.fps_show ) {
@@ -486,6 +735,105 @@ function DrawScene() {
     window.requestAnimationFrame( DrawScene );
 };
 
+
+//Функция рисования линии попиксельно
+function pixel_line( bytes, canvas_w, Rc, Gc, Bc, Ac, x0, y0, x1, y1 ) {
+    //http://rosettacode.org/wiki/Bitmap/Bresenham's_line_algorithm#JavaScript
+    let dx = Math.abs( x1 - x0 );
+    let sx = ( x0 < x1 ? 1 : -1 );
+    let dy = Math.abs( y1 - y0 );
+    let sy = ( y0 < y1 ? 1 : -1 );
+    let err = ( dx > dy ? dx : -dy ) / 2;
+    let e, n;
+    
+    while( true ) {
+        n =  ( x0 + y0 * canvas_w ) * 4;
+        bytes[ n] = Rc;
+        bytes[ n + 1 ] = Gc;
+        bytes[ n + 2 ] = Bc;
+        bytes[ n + 3 ] = Ac;
+        
+        if( x0 === x1 && y0 === y1 ) break;
+        
+        e = err;
+        if( e > -dx ) {
+            err -= dy;
+            x0 += sx;
+        }
+        if( e < dy ) {
+            err += dx;
+            y0 += sy;
+        }
+    }
+};
+
+//Функция заливки замкнутого контура попиксельно (глючно, но быстро)
+function pixel_full( bytes, canvas_w, Rc, Gc, Bc, Ac, x, y, Rf, Gf, Bf, Af ) {
+    let curr_pos, check_pos;
+    let curr_x = x, curr_y = y;
+    let tmp_x = x, tmp_y = y;
+    let find_x = x, find_y = y;
+    let op = 0;
+    let dir_left = true, dir_top = true;
+    
+    do {
+        curr_pos = ( curr_x + curr_y * canvas_w ) * 4;
+        
+        //Наткнулись на контур
+        if( bytes[ curr_pos ] === Rc && bytes[ curr_pos + 1 ] === Gc && bytes[ curr_pos + 2 ] === Bc && bytes[ curr_pos + 3 ] === Ac ) {
+            //Меняем направлениe направо, если двигались влево
+            if( dir_left ) {
+                dir_left = false;
+                curr_x = tmp_x, curr_y = tmp_y;
+            } else {
+                //Завершили движение направо, проверяем дошли ли до верха/низа фигуры
+                if( find_x === tmp_x  &&  find_y === tmp_y ) {
+                    if( dir_top ) {
+                        //Начинаем движение вниз от начальной точки
+                        dir_top = false;
+                        curr_x = find_x = x;
+                        curr_y = find_y = y;
+                        op++;
+                        continue;
+                    } else {
+                        //Дошли до низа фигуры, завершаем перекрас
+                        break;
+                    }
+                } else {
+                    //Сдвигаемся наверх/вниз
+                    dir_left = true;
+                    tmp_x = curr_x = find_x;
+                    tmp_y = curr_y = find_y;
+                }
+            }
+        } else {
+            //Перекрашиваем текущий пиксель
+            bytes[ curr_pos ] = Rf;
+            bytes[ curr_pos + 1 ] = Gf;
+            bytes[ curr_pos + 2 ] = Bf;
+            bytes[ curr_pos + 3 ] = Af;
+            
+            //Проверяем верхний/нижний пиксель
+            check_pos = ( curr_x + ( curr_y + ( dir_top ? -1 : 1 ) ) * canvas_w ) * 4;
+            if( bytes[ check_pos ] !== Rc  ||  bytes[ check_pos + 1 ] !== Gc  ||  bytes[ check_pos + 2 ] !== Bc  ||  bytes[ check_pos + 3 ] !== Ac ) {
+                //Сохраняем позицию найденного пикселя
+                find_x = curr_x;
+                find_y = curr_y + ( dir_top ? -1 : 1 );
+            }
+            
+            //Сдвигаемся на соседний пиксель
+            curr_x += ( dir_left ? -1 : 1 ); 
+        }
+        
+        //Ограничитель операций (подстраховка)
+        op++;
+    } while( op < 10000 );
+};
+
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------
+
 //Инициализация игровго движка
 function GameInit() {
     //Функция вывода ошибок инициализации пользователю
@@ -495,18 +843,25 @@ function GameInit() {
         return;
     }
     
-    //Добавляем свои методы для удобной работы со слоями отрисовки
-    Array.prototype.add = function( val ) {
-        if( typeof val === 'string' ) this.push( val );
+    //Перебираем сцены
+    let scenes_names = Object.getOwnPropertyNames( scenes );
+    for( let scn = 0; scn < scenes_names.length; scn++ ) {
+        let scene_name = scenes_names[ scn ];
+        
+        //Добавляем на сцену её название
+        scenes[ scenes_names[ scn ] ].name = scene_name;
+        
+        //Добавляем на сцену массив отрисовки
+        scenes[ scenes_names[ scn ] ].layers = [];
+        
+        //Добавляем функцию корректной очистки массива отрисовки
+        scenes[ scenes_names[ scn ] ].layers.clear = function() {
+            for( let i = 0, layers = game.scene.layers.length; i < layers; i++ ) {
+                //Удаляем объекты в обратном порядке
+                if( game.scene.layers.length > 0 ) game.scene.objects[ game.scene.layers[ game.scene.layers.length - 1 ] ].del();
+            }
+        };
     }
-    
-    Array.prototype.del = function( val ) {
-        if( typeof val === 'string' ) {
-            let val_pos = this.indexOf( val );
-            if( val_pos > -1 ) this.splice( val_pos, 1 );
-        }
-    }
-    
     //---------------------------------------------------------------------------------------------
     //localStorage --------------------------------------------------------------------------------
     //---------------------------------------------------------------------------------------------
@@ -537,12 +892,19 @@ function GameInit() {
     //---------------------------------------------------------------------------------------------
     //Canvas --------------------------------------------------------------------------------------
     //---------------------------------------------------------------------------------------------
+    //Основной холст
     game.canvas.id = document.getElementById( 'canvas' );
     game.canvas.width = game.canvas.id.width;
     game.canvas.height = game.canvas.id.height;
-    
     if( !( game.canvas.id.getContext  &&  game.canvas.id.getContext( '2d' ) ) ) return InitError( 'canvas' );
-    game.canvas.context = game.canvas.id.getContext( '2d', { alpha: true } );
+    game.canvas.context = game.canvas.id.getContext( '2d', { antialias: false, alpha: true } );
+    
+    //Вспомогательный холст
+    game.temp_canvas.id = document.createElement( 'canvas' );
+    game.temp_canvas.width = game.temp_canvas.width;
+    game.temp_canvas.height = game.temp_canvas.height;
+    if( !( game.temp_canvas.id.getContext  &&  game.temp_canvas.id.getContext( '2d' ) ) ) return InitError( 'canvas' );
+    game.temp_canvas.context = game.temp_canvas.id.getContext( '2d', { antialias: false, alpha: true } );
     
     //Проверяем доступность тача
     if( 'ontouchstart' in document.documentElement ) {
@@ -557,10 +919,21 @@ function GameInit() {
         game.cursor.pos_y = game.cursor.click_y = e.clientY - rect.top;
         game.cursor.pressed = true;
         
-        //Разрешение аудио
+        //Разрешаем аудио на странице
         if( !game.audio.enabled ) {
             game.audio.enabled = true;
             game.audio.context.resume();
+        }
+        
+        //Мегакостыли для полного экрана (ничего не придумал лучше)
+        if( tmp.menu !== undefined  &&  game.scene === scenes.menu ) {
+            if( tmp.menu.settings !== undefined ) {
+                //Включение/выключение полного экрана в настройках
+                game.scene.objects.settings.update();
+            } else if( tmp.menu.disclaimer !== undefined ) {
+                //Включаем полный экран через нажатие на дисклеймер (если так было сохранено в конфиге)
+                game.scene.objects.disclaimer.update();
+            }
         }
     }, false );
     game.canvas.id.addEventListener( 'mousemove', function( e ) {
@@ -576,6 +949,51 @@ function GameInit() {
     window.addEventListener( 'resize', function() {
         tmp.resize_start_ts = performance.now();
         game.canvas.resize = true;
+    }, false );
+    
+    //Обрабатываем колесико мыши
+    game.canvas.id.addEventListener( 'wheel', function( e ) {
+        e = e || window.event;
+        let delta = e.deltaY || e.detail || e.wheelDelta;
+        game.cursor.wheel += ( delta > 0 ? 1 : -1 );
+        e.preventDefault ? e.preventDefault() : (e.returnValue = false);
+    }, false );
+    
+    //---------------------------------------------------------------------------------------------
+    //Keyboard ------------------------------------------------------------------------------------
+    //---------------------------------------------------------------------------------------------
+    document.body.addEventListener ( 'keydown', function( e ) {
+        switch( e.keyCode ) {
+            case 9: //Tab
+                document.body.focus();
+                game.keyboard.tab++;
+                e.preventDefault ? e.preventDefault() : (e.returnValue = false);
+            break;
+            
+            case 107: //Плюс
+                game.keyboard.plus++;
+            break;
+            
+            case 109: //Минус
+                game.keyboard.minus++;
+            break;
+            
+            case 39: //Вправо
+                game.keyboard.right++;
+            break;
+            
+            case 37: //Влево
+                game.keyboard.left++;
+            break;
+            
+            case 38: //Вверх
+                game.keyboard.up++;
+            break;
+            
+            case 40: //Вниз
+                game.keyboard.down++;
+            break;
+        }
     }, false );
     
     //---------------------------------------------------------------------------------------------
@@ -597,7 +1015,7 @@ function GameInit() {
     //Sound ---------------------------------------------------------------------------------------
     //---------------------------------------------------------------------------------------------
     let mp3audio  = document.createElement( 'audio' );
-    game.mp3_sound = !!( mp3audio.canPlayType  &&  mp3audio.canPlayType( 'audio/mpeg;' ).replace( /no/, '' ) );
+    game.audio.mp3_support = !!( mp3audio.canPlayType  &&  mp3audio.canPlayType( 'audio/mpeg;' ).replace( /no/, '' ) );
     
     try {
         window.AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -623,14 +1041,32 @@ function GameInit() {
         frames: 0,
         prev_ts: 0.0
     };
+    tmp.download = {
+        resources: [],
+        files_count: 0,
+        files_checked: 0,
+        files_load: 0,
+        bytes_all: 0,
+        bytes_load: 0
+    };
     tmp.loading = [ 1, 4,  1, 9,  1, 14,  0, 20 ];
     
     //---------------------------------------------------------------------------------------------
-    //Запускаем сцену загрузки ресурсов -----------------------------------------------------------
     //---------------------------------------------------------------------------------------------
-    scenes.preloader.enable();
+    //---------------------------------------------------------------------------------------------
+    
+    //Запускаем сцену загрузки ресурсов
+    StartScene( 'preloader', function() {
+        //Добавляем прогрессбар на сцену
+        game.scene.objects.progressbar.add();
+    });
+    
+    //Включаем обновление и отрисовку объектов
     setTimeout( UpdateScene, game.delay );
     window.requestAnimationFrame( DrawScene );
+    
+    //Запускаем загрузкy внешних ресурсов
+    LoadResources();
 };
 //-------------------------------------------------------------------------------------------------
 
