@@ -7,20 +7,37 @@ scenes.kindergarten = {
         //-----------------------------------------------------------------------------------------
         background: {
             //Ресурсы объекта ---------------------------------------------------------------------
-            resources: {},
+            resources: {
+                nogame: { type: 'image', src: '/res/nogames.png' }
+            },
             
             //Инициализация объекта ---------------------------------------------------------------
             init: function() {
+                //Создаем временные переменные
+                this.tmp = {
+                    img_nogame: game.scene.objects.background.resources.nogame.data,
+                    x: Math.floor( ( game.canvas.width - 374 ) / 2 ),
+                    y: game.canvas.hidden_h + Math.floor( ( game.canvas.height - game.canvas.hidden_h - 265 ) / 2 ),
+                    hidden_h: game.canvas.hidden_h
+                };
             },
             //-------------------------------------------------------------------------------------
             
             //Обновление объекта ------------------------------------------------------------------
             update: function() {
+                let ltmp = this.tmp;
+                
+                //Автовыравнивание по вертикали
+                if( ltmp.hidden_h !== game.canvas.hidden_h ) {
+                    ltmp.hidden_h = game.canvas.hidden_h;
+                    ltmp.y = game.canvas.hidden_h + Math.floor( ( game.canvas.height - game.canvas.hidden_h - 265 ) / 2 );
+                }
             },
             //-------------------------------------------------------------------------------------
             
             //Отрисовка объекта -------------------------------------------------------------------
             draw: function() {
+                game.canvas.context.drawImage( this.tmp.img_nogame, this.tmp.x, this.tmp.y );
             }
             //-------------------------------------------------------------------------------------
         }

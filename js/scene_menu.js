@@ -56,6 +56,9 @@ scenes.menu = {
                         //Добавляем анона
                         //game.scene.objects.anon.add();
                         
+                        //Включаем редактирование опорных точек анона
+                        //game.scene.objects.body_editor.select( game.scene.objects.anon );
+                        
                         //Включаем полный экран (если так было сохранено в конфиге)
                         Fullscreen();
                     }
@@ -177,7 +180,7 @@ scenes.menu = {
                             } else {
                                 //Запускаем сцену десткого сада
                                 StartScene( 'kindergarten', function() {
-                                    
+                                    game.scene.objects.background.add();
                                 });
                             }
                         }
@@ -459,7 +462,7 @@ scenes.menu = {
                                 
                                 //Запускаем сцену десткого сада
                                 StartScene( 'kindergarten', function() {
-                                    
+                                    game.scene.objects.background.add();
                                 });
                             }
                         } else if( pos_x > win_x + 206 && pos_x < win_x + 316 && pos_y > win_y + 92  && pos_y < win_y + 126  ) {

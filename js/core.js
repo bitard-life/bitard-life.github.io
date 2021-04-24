@@ -129,7 +129,8 @@ var game = {
         up: 0,
         down: 0,
         left: 0,
-        right: 0
+        right: 0,
+        shift: false
     }
 };
 
@@ -543,6 +544,9 @@ function UpdateScene() {
         if( game.scene.layers.length !== temp_ind  ) break;
     }
     
+    //Запускаем очередную отрисовку кадра, когда это будет удобно браузеру
+    window.requestAnimationFrame( DrawScene, game.canvas.id );
+    
     //Запускаем очередную итерацию
     setTimeout( UpdateScene, game.delay );
 };
@@ -550,194 +554,186 @@ function UpdateScene() {
 //Цикл отрисовки сцены ----------------------------------------------------------------------------
 function DrawScene() {
     //Получаем временную метку начала отрисовки сцены
-    let draw_ts = performance.now();
+    let draw_ts = tmp.draw_ts = performance.now();
     
-    //Ограничиваем частоту отрисовки
-    if( draw_ts - tmp.draw_ts > game.delay ) {
-        tmp.draw_ts = draw_ts;
+    //Вычисление реальной частоты кадров
+    if( draw_ts - tmp.fps.prev_ts < 1000.0 ) {
+        tmp.fps.frames++;
+    } else {
+        //Обновляем на актуальное
+        game.fps = tmp.fps.frames;
         
-        //Вычисление реальной частоты кадров
-        if( draw_ts - tmp.fps.prev_ts < 1000.0 ) {
-            tmp.fps.frames++;
+        //Сбрасываем временную метку и счетчик кадров
+        tmp.fps.prev_ts = draw_ts;
+        tmp.fps.frames = 0;
+    }
+    
+    //Изменение размеров окна (не чаще 2-х раз в сек.)
+    if( game.canvas.resize && ( draw_ts - tmp.resize_start_ts > 250.0 ) && ( draw_ts - tmp.resize_ts > 500.0 ) ) {
+        game.canvas.resize = false;
+        tmp.resize_ts = draw_ts;
+        
+        let dpr = window.devicePixelRatio || 1;
+        let user_width = Math.max( window.innerWidth, window.innerHeight );
+        let user_height = Math.min( window.innerWidth, window.innerHeight );
+        
+        //Проверяем корректность ориентации экрана
+        game.canvas.rotate = ( window.innerHeight > window.innerWidth ? true : false );
+        if( game.canvas.rotate ) {
+            game.canvas.id.width = window.innerWidth - 20;
+            game.canvas.id.height = window.innerHeight - 20;
+            game.canvas.id.style.top = '0';
+            game.canvas.id.style.transformOrigin = 'center';
+            game.canvas.id.style.transform = 'scale( 1 )';
+            
+            //Фикс для мобил, задержка изменения фактических размеров экрана 3 сек.
+            if( draw_ts - tmp.resize_start_ts < 3000.0 ) game.canvas.resize = true;
         } else {
-            //Обновляем на актуальное
-            game.fps = tmp.fps.frames;
+            //Сбрасываем размеры холста
+            game.canvas.id.width = game.canvas.width;
+            game.canvas.id.height = game.canvas.height;
             
-            //Сбрасываем временную метку и счетчик кадров
-            tmp.fps.prev_ts = draw_ts;
-            tmp.fps.frames = 0;
-        }
-        
-        //Изменение размеров окна (не чаще 2-х раз в сек.)
-        if( game.canvas.resize && ( draw_ts - tmp.resize_start_ts > 250.0 ) && ( draw_ts - tmp.resize_ts > 500.0 ) ) {
-            game.canvas.resize = false;
-            tmp.resize_ts = draw_ts;
-            
-            let dpr = window.devicePixelRatio || 1;
-            let user_width = Math.max( window.innerWidth, window.innerHeight );
-            let user_height = Math.min( window.innerWidth, window.innerHeight );
-            
-            //Проверяем корректность ориентации экрана
-            game.canvas.rotate = ( window.innerHeight > window.innerWidth ? true : false );
-            if( game.canvas.rotate ) {
-                game.canvas.id.width = window.innerWidth - 20;
-                game.canvas.id.height = window.innerHeight - 20;
-                game.canvas.id.style.top = '0';
-                game.canvas.id.style.transformOrigin = 'center';
-                game.canvas.id.style.transform = 'scale( 1 )';
-                
-                //Фикс для мобил, задержка изменения фактических размеров экрана 3 сек.
-                if( draw_ts - tmp.resize_start_ts < 3000.0 ) game.canvas.resize = true;
-            } else {
-                //Сбрасываем размеры холста
-                game.canvas.id.width = game.canvas.width;
-                game.canvas.id.height = game.canvas.height;
-                
-                //Определяем, не нужно ли вернуть масштаб назад
-                if( parseInt( localStorage.getItem( 'resolution' ) )  >  config.resolution ) {
-                    if( 
-                        ( config.resolution + 1 ) * ( game.canvas.height - ( game.canvas.height / 100) * 29 )  <= user_height &&
-                        ( config.resolution + 1 ) * ( game.canvas.width -  ( game.canvas.width  / 100) * 9  )  <= user_width 
-                    ) {
-                        //Увеличиваем разрешение на один пункт
-                        config.resolution++;
-                        game.canvas.resize = true;
-                    }
+            //Определяем, не нужно ли вернуть масштаб назад
+            if( parseInt( localStorage.getItem( 'resolution' ) )  >  config.resolution ) {
+                if( 
+                    ( config.resolution + 1 ) * ( game.canvas.height - ( game.canvas.height / 100) * 29 )  <= user_height &&
+                    ( config.resolution + 1 ) * ( game.canvas.width -  ( game.canvas.width  / 100) * 9  )  <= user_width 
+                ) {
+                    //Увеличиваем разрешение на один пункт
+                    config.resolution++;
+                    game.canvas.resize = true;
                 }
+            }
+            
+            if( config.resolution === 0 ) {
+                //Автоматическое масштабирование по ширине
+                game.canvas.scale = user_width / game.canvas.width;
+                if( game.canvas.scale > 3.0 ) game.canvas.scale = 3.0;
                 
-                if( config.resolution === 0 ) {
-                    //Автоматическое масштабирование по ширине
+                //Определяем, не скрылось ли много по высоте ( 30% )
+                if ( game.canvas.height - user_height / game.canvas.scale > ( game.canvas.height / 100) * 30 ) {
+                    //Автоматическое масштабирование по высоте
+                    game.canvas.scale = user_height / game.canvas.height;
+                }
+            } else {
+                //Пользовательское разрешение
+                game.canvas.scale = config.resolution;
+                
+                //Определяем, не скрылось ли много по ширине ( 10% )
+                if ( game.canvas.width - user_width / game.canvas.scale > ( game.canvas.width / 100) * 10 ) {
+                    //Приводим к ширине масштаб
                     game.canvas.scale = user_width / game.canvas.width;
                     if( game.canvas.scale > 3.0 ) game.canvas.scale = 3.0;
                     
                     //Определяем, не скрылось ли много по высоте ( 30% )
                     if ( game.canvas.height - user_height / game.canvas.scale > ( game.canvas.height / 100) * 30 ) {
-                        //Автоматическое масштабирование по высоте
-                        game.canvas.scale = user_height / game.canvas.height;
+                        //Уменьшаем разрешение на один пункт
+                        config.resolution--;
+                        game.canvas.resize = true;
                     }
-                } else {
-                    //Пользовательское разрешение
-                    game.canvas.scale = config.resolution;
-                    
-                    //Определяем, не скрылось ли много по ширине ( 10% )
-                    if ( game.canvas.width - user_width / game.canvas.scale > ( game.canvas.width / 100) * 10 ) {
-                        //Приводим к ширине масштаб
-                        game.canvas.scale = user_width / game.canvas.width;
-                        if( game.canvas.scale > 3.0 ) game.canvas.scale = 3.0;
-                        
-                        //Определяем, не скрылось ли много по высоте ( 30% )
-                        if ( game.canvas.height - user_height / game.canvas.scale > ( game.canvas.height / 100) * 30 ) {
-                            //Уменьшаем разрешение на один пункт
-                            config.resolution--;
-                            game.canvas.resize = true;
-                        }
-                    //Определяем, не скрылось ли много по высоте ( 30% )
-                    } else if ( game.canvas.height - user_height / game.canvas.scale > ( game.canvas.height / 100) * 30 ) {
-                        //Приводим к высоте масштаб
-                        game.canvas.scale = user_height / game.canvas.height;
-                        if( game.canvas.scale < 1.0 ) {
-                            //Уменьшаем разрешение на один пункт
-                            config.resolution--;
-                            game.canvas.resize = true;
-                        }
+                //Определяем, не скрылось ли много по высоте ( 30% )
+                } else if ( game.canvas.height - user_height / game.canvas.scale > ( game.canvas.height / 100) * 30 ) {
+                    //Приводим к высоте масштаб
+                    game.canvas.scale = user_height / game.canvas.height;
+                    if( game.canvas.scale < 1.0 ) {
+                        //Уменьшаем разрешение на один пункт
+                        config.resolution--;
+                        game.canvas.resize = true;
                     }
                 }
-                
-                //Масштабируем канвас средствами css
-                game.canvas.id.style.transform = 'scale( '+ game.canvas.scale +' )';
-                
-                //Проверяем сколько скрыто по высоте
-                game.canvas.hidden_h = Math.floor( game.canvas.height - user_height / game.canvas.scale );
-                game.canvas.hidden_h = ( game.canvas.hidden_h < 0 ? 0 : game.canvas.hidden_h );
-                
-                //Провеяем центровку
-                if( user_height - ( game.canvas.scale * game.canvas.height ) > 1 ) {
-                    //Сверху есть место, центрируем канвас по вертикали
-                    game.canvas.id.style.top = '0';
-                    game.canvas.id.style.transformOrigin = 'center';
-                } else {
-                    //Места мало, притягиваем канвас к нижней границе экрана
-                    game.canvas.id.style.top = '';
-                    game.canvas.id.style.transformOrigin = 'bottom';
-                }
-            }
-        }
-        
-        //Очистка сцены
-        let context = game.canvas.context;
-        context.clearRect( 0, 0, game.canvas.width, game.canvas.height );
-        
-        //Проверяем правильность ориентации экрана
-        if( game.canvas.rotate === false) {
-            //Отрисовка рамки
-            context.strokeStyle = '#2F2F2F';
-            context.lineWidth = 1;
-            context.lineCap = 'butt';
-            context.strokeRect( 0, 0, game.canvas.width, game.canvas.height );
-            
-            //Отрисовка объектов сцены
-            for( let i = 0, layers_len = game.scene.layers.length; i < layers_len; i++ ) {
-                game.scene.objects[ game.scene.layers[ i ] ].draw();
-                
-                //Изменился список отрисовки
-                if( layers_len !== game.scene.layers.length ) break;
             }
             
-            //Постобработка кадра
-            if( config.post_proc ) game.postproc();
+            //Масштабируем канвас средствами css
+            game.canvas.id.style.transform = 'scale( '+ game.canvas.scale +' )';
             
-            //Отображение частоты кадров
-            if( config.fps_show ) {
-                context.fillStyle = '#ababab';
-                context.font = 'normal 8pt Arial';
-                context.fillText( 'FPS: ' + game.fps, 598, 356 );
+            //Проверяем сколько скрыто по высоте
+            game.canvas.hidden_h = Math.floor( game.canvas.height - user_height / game.canvas.scale );
+            game.canvas.hidden_h = ( game.canvas.hidden_h < 0 ? 0 : game.canvas.hidden_h );
+            
+            //Провеяем центровку
+            if( user_height - ( game.canvas.scale * game.canvas.height ) > 1 ) {
+                //Сверху есть место, центрируем канвас по вертикали
+                game.canvas.id.style.top = '0';
+                game.canvas.id.style.transformOrigin = 'center';
+            } else {
+                //Места мало, притягиваем канвас к нижней границе экрана
+                game.canvas.id.style.top = '';
+                game.canvas.id.style.transformOrigin = 'bottom';
             }
-        } else {
-            //Рисуем значок поворота экрана мобилы в горизонталь
-            let x_pos = Math.ceil( game.canvas.id.width / 2 );
-            let y_pos = Math.ceil( game.canvas.id.height / 2 );
-            let scale = Math.ceil( x_pos / 100 );
-            let icon = tmp.rotate_icon;
-            
-            context.strokeStyle = '#FFFFFF';
-            context.lineWidth = 4;
-            context.lineCap = 'round';
-            
-            context.beginPath();
-                context.moveTo( x_pos - scale * 47, y_pos + scale * 16 );
-                context.lineTo( x_pos + scale * 11, y_pos - scale * 44 );
-                context.lineTo( x_pos + scale * 43, y_pos - scale * 11 );
-                context.lineTo( x_pos - scale * 15, y_pos + scale * 47 );
-            context.closePath();
-            context.stroke();
-            
-            context.beginPath();
-                context.moveTo( x_pos - scale * 36, y_pos + scale * 5 );
-                context.lineTo( x_pos - scale * 4,  y_pos + scale * 36 );
-            context.stroke();
-                context.moveTo( x_pos - scale * 27, y_pos + scale * 24 );
-                context.lineTo( x_pos - scale * 24, y_pos + scale * 27 );
-            context.stroke();
-                context.moveTo( x_pos - scale * 48, y_pos - scale * 22 );
-                context.lineTo( x_pos - scale * 34, y_pos - scale * 36 );
-                context.lineTo( x_pos - scale * 12, y_pos - scale * 36 );
-            context.stroke();
-                context.moveTo( x_pos - scale * 12, y_pos - scale * 36 );
-                context.lineTo( x_pos - scale * 20, y_pos - scale * 44 );
-            context.stroke();
-                context.moveTo( x_pos - scale * 12, y_pos - scale * 36 );
-                context.lineTo( x_pos - scale * 20, y_pos - scale * 27 );
-            context.stroke();
         }
     }
     
-    //Запускаем очередную отрисовку кадра, когда это будет удобно браузеру
-    window.requestAnimationFrame( DrawScene );
+    //Очистка сцены
+    let context = game.canvas.context;
+    context.clearRect( 0, 0, game.canvas.width, game.canvas.height );
+    
+    //Проверяем правильность ориентации экрана
+    if( game.canvas.rotate === false) {
+        //Отрисовка рамки
+        context.strokeStyle = '#2F2F2F';
+        context.lineWidth = 1;
+        context.lineCap = 'butt';
+        context.strokeRect( 0, 0, game.canvas.width, game.canvas.height );
+        
+        //Отрисовка объектов сцены
+        for( let i = 0, layers_len = game.scene.layers.length; i < layers_len; i++ ) {
+            game.scene.objects[ game.scene.layers[ i ] ].draw();
+            
+            //Изменился список отрисовки
+            if( layers_len !== game.scene.layers.length ) break;
+        }
+        
+        //Постобработка кадра
+        if( config.post_proc ) game.postproc();
+        
+        //Отображение частоты кадров
+        if( config.fps_show ) {
+            context.fillStyle = '#ababab';
+            context.font = 'normal 8pt Arial';
+            context.fillText( 'FPS: ' + game.fps, 598, 356 );
+        }
+    } else {
+        //Рисуем значок поворота экрана мобилы в горизонталь
+        let x_pos = Math.ceil( game.canvas.id.width / 2 );
+        let y_pos = Math.ceil( game.canvas.id.height / 2 );
+        let scale = Math.ceil( x_pos / 100 );
+        let icon = tmp.rotate_icon;
+        
+        context.strokeStyle = '#FFFFFF';
+        context.lineWidth = 4;
+        context.lineCap = 'round';
+        
+        context.beginPath();
+            context.moveTo( x_pos - scale * 47, y_pos + scale * 16 );
+            context.lineTo( x_pos + scale * 11, y_pos - scale * 44 );
+            context.lineTo( x_pos + scale * 43, y_pos - scale * 11 );
+            context.lineTo( x_pos - scale * 15, y_pos + scale * 47 );
+        context.closePath();
+        context.stroke();
+        
+        context.beginPath();
+            context.moveTo( x_pos - scale * 36, y_pos + scale * 5 );
+            context.lineTo( x_pos - scale * 4,  y_pos + scale * 36 );
+        context.stroke();
+            context.moveTo( x_pos - scale * 27, y_pos + scale * 24 );
+            context.lineTo( x_pos - scale * 24, y_pos + scale * 27 );
+        context.stroke();
+            context.moveTo( x_pos - scale * 48, y_pos - scale * 22 );
+            context.lineTo( x_pos - scale * 34, y_pos - scale * 36 );
+            context.lineTo( x_pos - scale * 12, y_pos - scale * 36 );
+        context.stroke();
+            context.moveTo( x_pos - scale * 12, y_pos - scale * 36 );
+            context.lineTo( x_pos - scale * 20, y_pos - scale * 44 );
+        context.stroke();
+            context.moveTo( x_pos - scale * 12, y_pos - scale * 36 );
+            context.lineTo( x_pos - scale * 20, y_pos - scale * 27 );
+        context.stroke();
+    }
 };
 
 
 //Функция рисования линии попиксельно
-function pixel_line( bytes, canvas_w, Rc, Gc, Bc, Ac, x0, y0, x1, y1 ) {
+function PixelLine( bytes, canvas_w, Rc, Gc, Bc, Ac, x0, y0, x1, y1 ) {
     //http://rosettacode.org/wiki/Bitmap/Bresenham's_line_algorithm#JavaScript
     let dx = Math.abs( x1 - x0 );
     let sx = ( x0 < x1 ? 1 : -1 );
@@ -748,7 +744,7 @@ function pixel_line( bytes, canvas_w, Rc, Gc, Bc, Ac, x0, y0, x1, y1 ) {
     
     while( true ) {
         n =  ( x0 + y0 * canvas_w ) * 4;
-        bytes[ n] = Rc;
+        bytes[ n ] = Rc;
         bytes[ n + 1 ] = Gc;
         bytes[ n + 2 ] = Bc;
         bytes[ n + 3 ] = Ac;
@@ -768,7 +764,7 @@ function pixel_line( bytes, canvas_w, Rc, Gc, Bc, Ac, x0, y0, x1, y1 ) {
 };
 
 //Функция заливки замкнутого контура попиксельно (глючно, но быстро)
-function pixel_full( bytes, canvas_w, Rc, Gc, Bc, Ac, x, y, Rf, Gf, Bf, Af ) {
+function PixelFull( bytes, canvas_w, Rc, Gc, Bc, Ac, x, y, Rf, Gf, Bf, Af ) {
     let curr_pos, check_pos;
     let curr_x = x, curr_y = y;
     let tmp_x = x, tmp_y = y;
@@ -829,6 +825,79 @@ function pixel_full( bytes, canvas_w, Rc, Gc, Bc, Ac, x, y, Rf, Gf, Bf, Af ) {
         op++;
     } while( op < 10000 );
 };
+
+//Функция отрисовки стандартного тела на холст
+function DrawBody( body, line_color, x, y ) {
+    //Получаем короткие ссылки
+    let context = game.canvas.context;
+    let temp_context = game.temp_canvas.context;
+    
+    //Очищаем временный холст
+    temp_context.clearRect( 0, 0, game.temp_canvas.width, game.temp_canvas.height );
+    
+    //Копируем с него пустой кусок
+    let imageData = temp_context.getImageData( 0, 0, game.temp_canvas.width, game.temp_canvas.height );
+    let imageBytes = imageData.data;
+    let canvas_w = game.temp_canvas.width;
+    
+    //Рисуем на нем тело
+    let i, j;
+    let x0, y0, x1, y1;
+    let Rf, Gf, Bf, Af;
+    let Rc = line_color[ 0 ], Gc = line_color[ 1 ], Bc = line_color[ 2 ], Ac = line_color[ 3 ];
+    for( i = 0; i < body.length; i++ ) {
+        //Окантовка части тела
+        for( j = 6, points_len = body[ i ].length; j < points_len; j +=2 ) {
+            x0 = Math.floor( body[ i ][ j ] );
+            y0 = Math.floor( body[ i ][ j + 1 ] );
+            if( j !== points_len - 2 ) {
+                x1 = Math.floor( body[ i ][ j + 2 ] );
+                y1 = Math.floor( body[ i ][ j + 3 ] );  
+            } else {
+                x1 = Math.floor( body[ i ][ 6 ] );
+                y1 = Math.floor( body[ i ][ 7 ] );  
+            }
+            
+            PixelLine( imageBytes, canvas_w, Rc - i, Gc, Bc, Ac, x0, y0, x1, y1 );
+        }
+        
+        //Заливка части тела
+        Rf = body[ i ][ 2 ];
+        Gf = body[ i ][ 3 ];
+        Bf = body[ i ][ 4 ];
+        Af = body[ i ][ 5 ];
+        PixelFull( imageBytes, canvas_w, Rc - i, Gc, Bc, Ac, body[ i ][ 0 ], body[ i ][ 1 ], Rf, Gf, Bf, Af );
+        
+        //Очистка верхнего ребра от окантовки (для основных частей тела)
+        if( i < 8 ) {
+            x0 = Math.floor( body[ i ][ points_len - 2 ] );
+            y0 = Math.floor( body[ i ][ points_len - 1 ] );
+            x1 = Math.floor( body[ i ][ 6 ] );
+            y1 = Math.floor( body[ i ][ 7 ] );
+            
+            //Чертим линию цвета заливки
+            PixelLine( imageBytes, canvas_w, Rf, Gf, Bf, Af, x0, y0, x1, y1 );
+            
+            //Восстанавливаем крайние точки
+            j =  ( x0 + y0 * canvas_w ) * 4;
+            imageBytes[ j ] = Rc;
+            imageBytes[ j + 1 ] = Gc;
+            imageBytes[ j + 2 ] = Bc;
+            imageBytes[ j + 3 ] = Ac;
+            j =  ( x1 + y1 * canvas_w ) * 4;
+            imageBytes[ j ] = Rc;
+            imageBytes[ j + 1 ] = Gc;
+            imageBytes[ j + 2 ] = Bc;
+            imageBytes[ j + 3 ] = Ac;
+        }
+    }
+    
+    //Возвращаем на временный холст отрисованный кусок
+    temp_context.putImageData( imageData, 0, 0 );
+    
+    //Копируем со временного холста на основной
+    game.canvas.context.drawImage( game.temp_canvas.id, x, y );
+}
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
@@ -993,6 +1062,18 @@ function GameInit() {
             case 40: //Вниз
                 game.keyboard.down++;
             break;
+            
+            case 16: //Shift
+                game.keyboard.shift = true;
+            break;
+        }
+    }, false );
+    
+    document.body.addEventListener ( 'keyup', function( e ) {
+        switch( e.keyCode ) {
+            case 16: //Shift
+                game.keyboard.shift = false;
+            break;
         }
     }, false );
     
@@ -1063,7 +1144,6 @@ function GameInit() {
     
     //Включаем обновление и отрисовку объектов
     setTimeout( UpdateScene, game.delay );
-    window.requestAnimationFrame( DrawScene );
     
     //Запускаем загрузкy внешних ресурсов
     LoadResources();
