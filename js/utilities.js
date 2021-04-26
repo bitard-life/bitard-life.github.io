@@ -3,95 +3,100 @@ scenes.utilities = {
     //Объекты сцены -------------------------------------------------------------------------------
     objects: {
         //-----------------------------------------------------------------------------------------
-        //Редактор анимаций персонажей ------------------------------------------------------------
+        //Редактор опорных точек объекта ----------------------------------------------------------
         //
         //Подключение:
-        //1) Импортируйте объект на сцену:
-        //   scenes.SCENE_NAME.objects.body_editor = scenes.utilities.objects.body_editor;
-        //2) Запустите сцену и добавьте на неё персонажа
-        //3) Подключитесь к персонажу через вызов select:
-        //   game.scene.objects.body_editor.select( game.scene.objects.CHARACTER );
+        //1) Импортируйте редактор на сцену (до запуска сцены):
+        //   scenes.SCENE_NAME.objects.points_editor = scenes.utilities.objects.points_editor;
+        //2) Запустите сцену и добавьте на неё редактируемый объект:
+        //   game.scene.objects.OBJECT.add();
+        //3) Подключитесь к объекту через вызов select:
+        //   game.scene.objects.points_editor.select( game.scene.objects.OBJECT );
         //
         //Управление:
-        // - Tab: переключение редактирования на следующую часть тела
-        // - Колесико мыши: выделение следующей/предыдущей опорной точки текущей части тела
-        // - Стрелочки (вверх, вниз, влево, вправо): сдвиг выделенной опорной точки на 1px.
-        // - Стрелочки + Shift: сдвиг опорных точек всей части тела на 1px.
+        // - [ Page Up / Page Down ]: переключение редактирования на следующий/предыдущий слой.
+        // - Shift + [ Page Up / Page Down ]: поднять/опустить порядок отрисовки слоя.
+        // - Колесико мыши: переключение выделения на следующую/предыдущую опорную точку текущего слоя.
+        // - Shift + Колесико мыши: вращение текущего слоя вокруг точки заливки.
+        // - [ Вверх / Вниз / Вправо / Влево ]: сдвиг выделенной опорной точки на 1px.
+        // - Shift + [ Вверх / Вниз / Вправо / Влево ]: сдвиг всех опорных точек слоя на 1px.
+        // - [ Плюс / Минус ]: добавить/удалить опорную точку.
+        // - Shift + [ Плюс / Минус ]: добавить/удалить слой (добавляется над текущим).
+        // - Delete: включить/отключить очистку первого ребра от контура.
         //-----------------------------------------------------------------------------------------
-        body_editor: {
+        points_editor: {
             //Инициализация объекта ---------------------------------------------------------------
             init: function() {
                 //Создаем временные переменные
                 this.tmp = {
                     object: null,
-                    body: null,
-                    sel_part: 0,
+                    ref_points: null,
+                    sel_layer: 1,
                     sel_point: 0,
                     cos: Math.cos( 0.1 ),
                     sin: Math.sin( 0.1 ),
                     control: {
-                        wheel: game.cursor.wheel,
-                        tab: game.keyboard.tab,
-                        up: game.keyboard.up,
-                        down: game.keyboard.down,
-                        left: game.keyboard.left,
-                        right: game.keyboard.right
+                        wheel:      game.cursor.wheel,
+                        tab:        game.keyboard.tab,
+                        up:         game.keyboard.up,
+                        down:       game.keyboard.down,
+                        left:       game.keyboard.left,
+                        page_up:    game.keyboard.page_up,
+                        page_down:  game.keyboard.page_down,
+                        minus:      game.keyboard.minus,
+                        plus:       game.keyboard.plus,
+                        del:        game.keyboard.del
                     }
                 }
             },
             
-            //Подключение к телу ------------------------------------------------------------------
-            select: function( body ) {
+            //Подключение к редактируемому объекту ------------------------------------------------
+            select: function( object ) {
                 //Проверяем наличие опорных точек
-                if( body.tmp.body === undefined ) {
-                    console.log( 'body_editor.select(); -> Ошибка: не найдены опорные точки!');
+                if( object.tmp.ref_points === undefined ) {
+                    console.log( 'points_editor.select(); -> Ошибка: не найдены опорные точки!');
                     return;
                 }
                 
                 //Добавляем редактор на сцену
                 if( this.tmp === undefined ) {
-                    game.scene.objects.body_editor.add();
+                    game.scene.objects.points_editor.add();
                 }
                 
                 //Подключаемся
-                this.tmp.object = body;
-                this.tmp.body = body.tmp.body;
+                this.tmp.object = object;
+                this.tmp.ref_points = object.tmp.ref_points;
             },
             
             //Выводит в консоль готовый слепок опорных точек  -------------------------------------
             print: function() {
                 //Добавляем редактор на сцену
                 if( this.tmp === undefined ) {
-                    console.log( 'body_editor.print(); -> Ошибка: тело персонажа не было подключено!');
+                    console.log( 'points_editor.print(); -> Ошибка: объект для редактирования не был подключен!');
                     return;
                 }
                 
                 //Получаем короткие ссылки
-                let ltmp = this.tmp;
-                let body = ltmp.body;
-                let i, j;
-                let x0, y0;
-                let R, G, B, A;
+                let ref_points = this.tmp.ref_points;
                 
                 //Создаем пустой массив
                 let output = [];
                 
                 //Копируем в него текущие опорные точки
-                for( let i = 0; i < body.length; i++ ) {
+                for( let i = 0; i < ref_points.length; i++ ) {
                     output[ i ] = [];
                     
-                    //Окантовка части тела
-                    for( let j = 0; j < body[ i ].length; j++ ) {
-                        output[ i ].push( Math.floor( body[ i ][ j ] ) );
+                    for( let j = 0; j < ref_points[ i ].length; j++ ) {
+                        output[ i ].push( Math.floor( ref_points[ i ][ j ] ) );
                     }
                 }
                 
-                //Форматируем массив в удобный формат строки
+                //Формируем из массива строку в удобном формате
                 let output_str = JSON.stringify( output );
                 output_str = output_str.replace( /\],/g, "],\n" ).replace( /\]\]/, "]\n  ]" ).replace( /\[\[/, "  [\n[" );
                 output_str = output_str.replace( /\[/g, "    [" ).replace( /      \[/g, "  [" );
                 
-                //Выводим новый массив в консоль
+                //Выводим строку в консоль
                 console.log( output_str );
             },
             
@@ -99,54 +104,140 @@ scenes.utilities = {
             update: function() {
                 //Получаем короткие ссылки
                 let ltmp = this.tmp;
-                let body = ltmp.body;
+                let ref_points = ltmp.ref_points;
                 let control = ltmp.control;
                 let direction = 0;
+                let Ix, Iy, x, y, i, j;
                 
-                if( body === null ) return;
+                if( ref_points === null ) return;
                 
-                let max_point = Math.floor( ( body[ ltmp.sel_part ].length - 6 ) / 2 );
-                
-                //Преключаемся на другую часть тела
-                if( control.tab !== game.keyboard.tab ) {
-                    let max_parts = body.length - 1;
-                    ltmp.sel_point = 0;
-                    ltmp.sel_part = ( ltmp.sel_part === max_parts ? 0 : ltmp.sel_part + 1 );
-                    control.tab = game.keyboard.tab;
-                }
-                
-                //Преключаемся на другую точку или крутим часть тела
-                direction = 0;
-                if( control.wheel !== game.cursor.wheel ) {
-                    direction = ( control.wheel > game.cursor.wheel ? 1 : 2 );
-                    control.wheel = game.cursor.wheel;
+                //Преключаемся на другой слой или меняем порядок слоёв
+                if( control.page_up !== game.keyboard.page_up  ||  control.page_down !== game.keyboard.page_down ) {
+                    //Определяем направление переключения
+                    direction = ( control.page_up !== game.keyboard.page_up ? 0 : 1 );
+                    control.page_up = game.keyboard.page_up;
+                    control.page_down = game.keyboard.page_down;
                     
-                    //Крутим часть тела
+                    let layers_len = ref_points.length - 1;
+                    
+                    //Поднимаем/опускаем порядок отрисовки слоя
                     if( game.keyboard.shift === true ) {
-                        for( let i = 1; i < max_point + 1; i++ ) {
-                            let Ix = 6 + ( i - 1) * 2;
-                            let Iy = Ix + 1;
-                            let ox = body[ ltmp.sel_part ][ 0 ];
-                            let oy = body[ ltmp.sel_part ][ 1 ];
-                            let x = body[ ltmp.sel_part ][ Ix ];
-                            let y = body[ ltmp.sel_part ][ Iy ];
-                            let cos = ltmp.cos;
-                            let sin = ltmp.sin * ( direction === 1 ? 1 : -1 );
-                            
-                            body[ ltmp.sel_part ][ Ix ] = ( cos * ( x - ox ) ) - ( sin * ( y - oy ) ) + ox;
-                            body[ ltmp.sel_part ][ Iy ] = ( sin * ( x - ox ) ) + ( cos * ( y - oy ) ) + oy;
+                        let tmp_layer;
+                        //Поднимаем слой
+                        if( direction === 0 ) {
+                            if( ltmp.sel_layer !== layers_len ) {
+                                tmp_layer = ref_points[ ltmp.sel_layer + 1 ];
+                                ref_points[ ltmp.sel_layer + 1 ] = ref_points[ ltmp.sel_layer ];
+                                ref_points[ ltmp.sel_layer ] = tmp_layer;
+                                ltmp.sel_layer++;
+                            }
+                        } else if( ltmp.sel_layer !== 1 ) {
+                            //Опускаем слой
+                            tmp_layer = ref_points[ ltmp.sel_layer - 1 ];
+                            ref_points[ ltmp.sel_layer - 1 ] = ref_points[ ltmp.sel_layer ];
+                            ref_points[ ltmp.sel_layer ] = tmp_layer;
+                            ltmp.sel_layer--;
                         }
                     } else {
-                        //Сдвигаем выделение опорной точки на соседнюю
-                        if( direction === 1 ) {
-                            ltmp.sel_point = ( ltmp.sel_point === max_point ? 0 : ltmp.sel_point + 1 );
+                        //Переключаем активный слой на соседний
+                        if( direction === 0 ) {
+                            ltmp.sel_layer = ( ltmp.sel_layer === layers_len ? 1 : ltmp.sel_layer + 1 );
                         } else {
-                            ltmp.sel_point = ( ltmp.sel_point === 0 ? max_point : ltmp.sel_point - 1 );
+                            ltmp.sel_layer = ( ltmp.sel_layer === 1 ? layers_len : ltmp.sel_layer - 1 );
+                        }
+                        ltmp.sel_point = 0;
+                    }
+                }
+                
+                //Определяем количество опорных точек активного слоя (без точки заливки)
+                let points_len = Math.floor( ( ref_points[ ltmp.sel_layer ].length - 7 ) / 2 );
+                
+                //Добавление/удаление опорных точек или слоя
+                if( control.minus !== game.keyboard.minus  ||  control.plus !== game.keyboard.plus ) {
+                    //Определяем тип действия
+                    direction = ( control.minus !== game.keyboard.minus ? 0 : 1 );
+                    control.minus = game.keyboard.minus;
+                    control.plus = game.keyboard.plus;
+                    
+                    //Добавляем/удаляем  слой
+                    if( game.keyboard.shift === true ) {
+                        //Удаляем
+                        if( direction === 0 ) {
+                            let layers_len = ref_points.length - 1;
+                            
+                            //Минимум 1 слой должен оставаться
+                            if( layers_len > 1 ) {
+                                ref_points.splice( ltmp.sel_layer, 1 );
+                                layers_len--;
+                                ltmp.sel_layer = ( ltmp.sel_layer === 1 ? layers_len : ltmp.sel_layer - 1 )
+                            }
+                        } else {
+                            //Добавляем
+                            ref_points.splice( ltmp.sel_layer + 1, 0, [0,0,0,255,0,75,75,75,71,68,78,82,78] );
+                            ltmp.sel_layer++;
+                        }
+                        
+                    } else if( ltmp.sel_point !== 0 ) {
+                        //Добавляем/удаляем опорную точку
+                        Ix = 7 + ( ltmp.sel_point - 1) * 2;
+                        Iy = Ix + 1;
+                        
+                        //Удаляем
+                        if( direction === 0 ) {
+                            //Минимум 3 точки должны оставаться в слое
+                            if( points_len > 3 ) {
+                                ref_points[ ltmp.sel_layer ].splice( Ix, 2 );
+                                if( ltmp.sel_point === points_len ) ltmp.sel_point--;
+                                points_len--;
+                            }
+                        } else {
+                            //Добавляем
+                            x = ref_points[ ltmp.sel_layer ][ Ix ] + 5;
+                            y = ref_points[ ltmp.sel_layer ][ Iy ] + 5;
+                            ref_points[ ltmp.sel_layer ].splice( Ix, 0, y );
+                            ref_points[ ltmp.sel_layer ].splice( Ix, 0, x );
+                            points_len++;
                         }
                     }
                 }
                 
-                //Редактируем точку
+                //Преключаем выделение на другую точку или крутим весь слой
+                if( control.wheel !== game.cursor.wheel ) {
+                    direction = ( control.wheel > game.cursor.wheel ? 0 : 1 );
+                    control.wheel = game.cursor.wheel;
+                    
+                    //Крутим слой вокруг точки заливки слоя
+                    if( game.keyboard.shift === true ) {
+                        //Получаем координаты точки заливки (вращать будем вокруг неё)
+                        let Fx = ref_points[ ltmp.sel_layer ][ 5 ];
+                        let Fy = ref_points[ ltmp.sel_layer ][ 6 ];
+                        
+                        //Вращаем опорные точки
+                        for( i = 0; i < points_len; i++ ) {
+                            //Получаем опорную точку
+                            Ix = 7 + i * 2;
+                            Iy = Ix + 1;
+                            x = ref_points[ ltmp.sel_layer ][ Ix ];
+                            y = ref_points[ ltmp.sel_layer ][ Iy ];
+                            
+                            //Определяем направление вращения
+                            let sin = ( direction === 0 ? ltmp.sin : -ltmp.sin );
+                            
+                            //Преобразуем координаты
+                            ref_points[ ltmp.sel_layer ][ Ix ] = ( ltmp.cos * ( x - Fx ) ) - ( sin * ( y - Fy ) ) + Fx;
+                            ref_points[ ltmp.sel_layer ][ Iy ] = ( sin * ( x - Fx ) ) + ( ltmp.cos * ( y - Fy ) ) + Fy;
+                        }
+                    } else {
+                        //Переключаем выделение опорной точки на соседнюю
+                        if( direction === 0 ) {
+                            ltmp.sel_point = ( ltmp.sel_point === points_len ? 0 : ltmp.sel_point + 1 );
+                        } else {
+                            ltmp.sel_point = ( ltmp.sel_point === 0 ? points_len : ltmp.sel_point - 1 );
+                        }
+                    }
+                }
+                
+                //Сдвигаем опорную точку/точки
                 direction = 0;
                 if( control.up !== game.keyboard.up ) {
                     control.up = game.keyboard.up;
@@ -164,34 +255,43 @@ scenes.utilities = {
                     control.right = game.keyboard.right;
                     direction = 4;
                 }
-                
                 if( direction !== 0 ) {
-                    let select = ( game.keyboard.shift === true ? max_point + 1 : 1 );
-                    for( let i = 0; i < select; i++ ) {
-                        let select_point = ( select === 1 ? ltmp.sel_point : i );
-                        let Ix = ( select_point === 0 ? 0 : 6 + ( select_point - 1) * 2 );
-                        let Iy = Ix + 1;
-                        let x = body[ ltmp.sel_part ][ Ix ];
-                        let y = body[ ltmp.sel_part ][ Iy ];
+                    let select_points = ( game.keyboard.shift === true ? points_len + 1 : 1 );
+                    for( i = 0; i < select_points; i++ ) {
+                        //Определяем индекс выделенной точки
+                        j = ( select_points === 1 ? ltmp.sel_point : i );
                         
+                        //Получаем опорную точку
+                        Ix = 5 + j * 2;
+                        Iy = Ix + 1;
+                        x = ref_points[ ltmp.sel_layer ][ Ix ];
+                        y = ref_points[ ltmp.sel_layer ][ Iy ];
+                        
+                        //Сдвигаем
                         switch( direction ) {
                             case 1:
-                                if( y > 0 ) body[ ltmp.sel_part ][ Iy ]--;
+                                if( y > 0 ) ref_points[ ltmp.sel_layer ][ Iy ]--;
                             break;
                             
                             case 2:
-                                if( y < game.temp_canvas.height - 1 ) body[ ltmp.sel_part ][ Iy ]++;
+                                if( y < game.temp_canvas.height - 1 ) ref_points[ ltmp.sel_layer ][ Iy ]++;
                             break;
                             
                             case 3:
-                                if( x > 0 ) body[ ltmp.sel_part ][ Ix ]--;
+                                if( x > 0 ) ref_points[ ltmp.sel_layer ][ Ix ]--;
                             break;
                             
                             case 4:
-                                if( x < game.temp_canvas.width - 1 ) body[ ltmp.sel_part ][ Ix ]++;
+                                if( x < game.temp_canvas.width - 1 ) ref_points[ ltmp.sel_layer ][ Ix ]++;
                             break;
                         }
                     }
+                }
+                
+                //Включаем/выключаем очистку от окантовки между первой и второй точкой
+                if( control.del !== game.keyboard.del ) {
+                    control.del = game.keyboard.del;
+                    ref_points[ ltmp.sel_layer ][ 0 ] = ( ref_points[ ltmp.sel_layer ][ 0 ] === 1 ? 0 : 1 );
                 }
             },
             
@@ -200,20 +300,36 @@ scenes.utilities = {
                 //Получаем короткие ссылки
                 let context = game.canvas.context;
                 let ltmp = this.tmp;
-                let body = ltmp.body;
-                if( body === null ) return;
+                let ref_points = ltmp.ref_points;
+                if( ref_points === null ) return;
                 
                 let x = ltmp.object.tmp.x;
                 let y = ltmp.object.tmp.y;
+                let layer = ltmp.sel_layer;
+                let layers_len = ref_points[ layer ].length;
                 
-                context.fillStyle = ( ltmp.sel_point === 0 ? 'rgba(60,255,0,255)' : 'rgba(0,190,255,255)' );
-                context.fillRect( x + body[ ltmp.sel_part ][ 0 ], y + body[ ltmp.sel_part ][ 1 ], 1, 1 );
-                
-                for( let i = 6, j = ltmp.sel_part, selected = false; i < body[ j ].length; i += 2 ) {
-                    selected = ( ltmp.sel_point === Math.floor( ( i - 4 ) / 2 ) );
-                    context.fillStyle = ( selected ? 'rgba(60,255,0,255)' : 'rgba(255,0,0,255)' );
-                    context.fillRect( x + body[ j ][ i ], y + body[ j ][ i + 1 ], 1, 1 );
+                //Рисуем опорные точки
+                for( let i = 5, selected = false, fill = false; i < layers_len; i += 2 ) {
+                    selected = ( ltmp.sel_point === Math.floor( ( i - 5 ) / 2 ) );
+                    fill = ( i > 6 ? false :  true );
+                    
+                    context.fillStyle = ( selected ? 'rgb(60,255,0)' : ( fill ? 'rgb(0,190,255)' : 'rgb(255,0,0)' ) );
+                    context.fillRect( x + Math.floor( ref_points[ layer ][ i ] ), y + Math.floor( ref_points[ layer ][ i + 1 ] ), 1, 1 );
                 }
+                
+                //Обводим контуром рабочую область
+                context.fillStyle = 'rgb(255,255,255)';
+                context.fillRect( x - 1, y - 1, game.temp_canvas.width + 1, 1 );
+                context.fillRect( x - 1, y - 1, 1, game.temp_canvas.height + 1 );
+                context.fillRect( x + game.temp_canvas.width, y - 1, 1, game.temp_canvas.height + 1 );
+                context.fillRect( x - 1, y + game.temp_canvas.height, game.temp_canvas.width + 2, 1 );
+                
+                //Выводим информацию
+                context.fillStyle = 'rgb(255,255,255)';
+                context.fillRect( x - 1, y - 12, 50, 12 );
+                context.fillStyle = 'rgb(0,0,0)';
+                context.font = 'normal 7pt Arial';
+                context.fillText( 'Слой: ' + ltmp.sel_layer, x + 1, y - 3 );
             }
         }
     }

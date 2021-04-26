@@ -127,11 +127,11 @@ scenes.preloader = {
                 context.drawImage( ltmp.img_logo, ltmp.logo_x, ltmp.logo_y );
                 
                 //Рисуем контур прогрессбара
-                context.fillStyle = '#222222';
+                context.fillStyle = 'rgb(34,34,34)';
                 context.fillRect( ltmp.bar_x, ltmp.bar_y, ltmp.bar_width, 20 );
                     
                 //Рисуем полосу прогресса
-                context.fillStyle = '#888888';
+                context.fillStyle = 'rgb(136,136,136)';
                 context.fillRect( ltmp.bar_x + 5, ltmp.bar_y + 5, ltmp.progress, 10 );
             }
         }

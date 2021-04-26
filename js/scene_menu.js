@@ -54,10 +54,10 @@ scenes.menu = {
                         game.scene.objects.menu.add();
                         
                         //Добавляем анона
-                        //game.scene.objects.anon.add();
+                        game.scene.objects.anon.add();
                         
                         //Включаем редактирование опорных точек анона
-                        //game.scene.objects.body_editor.select( game.scene.objects.anon );
+                        game.scene.objects.points_editor.select( game.scene.objects.anon );
                         
                         //Включаем полный экран (если так было сохранено в конфиге)
                         Fullscreen();
@@ -94,7 +94,7 @@ scenes.menu = {
         //-----------------------------------------------------------------------------------------
         //Импорт редактора анимаций----------------------------------------------------------------
         //-----------------------------------------------------------------------------------------
-        body_editor: scenes.utilities.objects.body_editor,
+        points_editor: scenes.utilities.objects.points_editor,
         
         //-----------------------------------------------------------------------------------------
         //Меню ------------------------------------------------------------------------------------
@@ -116,6 +116,7 @@ scenes.menu = {
                     img_roof: game.scene.objects.menu.resources.roof.data,
                     mouse_x:   game.cursor.pos_x,
                     mouse_y:   game.cursor.pos_y,
+                    anon_rand_anim: Math.floor( Math.random() * 10 ) * Math.floor( 1000 / game.delay ),
                     select: 0
                 };
                 //Запускаем фоновый звук
@@ -157,7 +158,7 @@ scenes.menu = {
                 }
                 
                 //Движение мыши
-                if( ltmp.mouse_x !== game.cursor.pos_x || ltmp.mouse_x !== game.cursor.pos_y || click ) {
+                if( ltmp.mouse_x !== game.cursor.pos_x || ltmp.mouse_y !== game.cursor.pos_y || click ) {
                     //Преобразуем в кординаты холста
                     if( !click ) {
                         pos_x = Math.ceil( game.cursor.pos_x / game.canvas.scale );
@@ -166,7 +167,7 @@ scenes.menu = {
                     
                     //Сохраняем координаты мыши
                     ltmp.mouse_x = game.cursor.pos_x;
-                    ltmp.mouse_x = game.cursor.pos_y;
+                    ltmp.mouse_y = game.cursor.pos_y;
                     
                     //Обрабатываем движение мыши
                     ltmp.select = 0;
@@ -194,6 +195,24 @@ scenes.menu = {
                         if( click ) game.scene.objects.settings.add();
                     }
                 }
+                
+                //Случайные движения анона
+                ltmp.anon_rand_anim--;
+                if( ltmp.anon_rand_anim < 0 ) {
+                    //Выбираем случайное время для следующего движения
+                    ltmp.anon_rand_anim = ( 4 + Math.floor( Math.random() * 10 ) ) * Math.floor( 1000 / game.delay );
+                    
+                    //Выбираем случайное движение ( 1 или 2 фаза )
+                    game.scene.objects.anon.play(
+                        game.scene.objects.anon.animations.menu, 
+                        1000, 
+                        false, 
+                        Math.floor( Math.random() * 2 ) + 1,
+                        1,
+                        0
+                    );
+                    
+                }
             },
             
             //Отрисовка объекта -------------------------------------------------------------------
@@ -220,7 +239,7 @@ scenes.menu = {
         settings: {
             //Ресурсы объекта ---------------------------------------------------------------------
             resources: {
-                window: { type: 'image', src: '/res/menu/settings.png' }
+                sett_window: { type: 'image', src: '/res/menu/settings.png' }
             },
             
             //Инициализация объекта ---------------------------------------------------------------
@@ -231,7 +250,7 @@ scenes.menu = {
                     y: game.canvas.hidden_h + Math.floor( ( game.canvas.height - game.canvas.hidden_h - 225 ) / 2 ),
                     w: 283,
                     h: 225,
-                    img_sett: game.scene.objects.settings.resources.window.data,
+                    img_sett: game.scene.objects.settings.resources.sett_window.data,
                     hidden_h: game.canvas.hidden_h,
                     mouse_x:   game.cursor.pos_x,
                     mouse_y:   game.cursor.pos_y,
@@ -270,7 +289,7 @@ scenes.menu = {
                 }
                 
                 //Движение мыши
-                if( ltmp.mouse_x !== game.cursor.pos_x || ltmp.mouse_x !== game.cursor.pos_y || click ) {
+                if( ltmp.mouse_x !== game.cursor.pos_x || ltmp.mouse_y !== game.cursor.pos_y || click ) {
                     //Преобразуем в кординаты холста
                     if( !click ) {
                         pos_x = Math.ceil( game.cursor.pos_x / game.canvas.scale );
@@ -279,7 +298,7 @@ scenes.menu = {
                     
                     //Сохраняем координаты мыши
                     ltmp.mouse_x = game.cursor.pos_x;
-                    ltmp.mouse_x = game.cursor.pos_y;
+                    ltmp.mouse_y = game.cursor.pos_y;
                     
                     //Обрабатываем движение мыши
                     if( pos_x > win_x && pos_x <  win_x + win_w && pos_y > win_y && win_y <  win_y + win_h ) {
@@ -395,7 +414,7 @@ scenes.menu = {
         warning: {
             //Ресурсы объекта ---------------------------------------------------------------------
             resources: {
-                window: { type: 'image', src: '/res/menu/warning.png' }
+                warn_window: { type: 'image', src: '/res/menu/warning.png' }
             },
             
             //Инициализация объекта ---------------------------------------------------------------
@@ -406,7 +425,7 @@ scenes.menu = {
                     y: game.canvas.hidden_h + Math.floor( ( game.canvas.height - game.canvas.hidden_h - 148 ) / 2 ),
                     w: 354,
                     h: 148,
-                    img_warn: game.scene.objects.warning.resources.window.data,
+                    img_warn: game.scene.objects.warning.resources.warn_window.data,
                     mouse_x: game.cursor.pos_x,
                     mouse_y: game.cursor.pos_y,
                     select: 0
@@ -438,7 +457,7 @@ scenes.menu = {
                 }
                 
                 //Движение мыши
-                if( ltmp.mouse_x !== game.cursor.pos_x || ltmp.mouse_x !== game.cursor.pos_y || click ) {
+                if( ltmp.mouse_x !== game.cursor.pos_x || ltmp.mouse_y !== game.cursor.pos_y || click ) {
                     //Преобразуем в кординаты холста
                     if( !click ) {
                         pos_x = Math.ceil( game.cursor.pos_x / game.canvas.scale );
@@ -447,7 +466,7 @@ scenes.menu = {
                     
                     //Сохраняем координаты мыши
                     ltmp.mouse_x = game.cursor.pos_x;
-                    ltmp.mouse_x = game.cursor.pos_y;
+                    ltmp.mouse_y = game.cursor.pos_y;
                     
                     //Обрабатываем движение мыши
                     if( pos_x > win_x && pos_x <  win_x + win_w && pos_y > win_y && win_y <  win_y + win_h ) {

@@ -48,7 +48,7 @@ var scenes = {
                     let y = Math.ceil( ( game.canvas.height + game.canvas.hidden_h ) / 2 ) - 10;
                     
                     context.clearRect( 0, 0, game.canvas.width, game.canvas.height );
-                    context.fillStyle = '#bcbcbc';
+                    context.fillStyle = 'rgb(188,188,188)';
                     
                     for( let i = 0, w = 4; i < 4; i++ ) {
                         if( iter[ i * 2 + 1 ] == 4 ) {
@@ -130,6 +130,9 @@ var game = {
         down: 0,
         left: 0,
         right: 0,
+        page_up: 0,
+        page_down: 0,
+        del: 0,
         shift: false
     }
 };
@@ -316,6 +319,9 @@ function StartScene( scene_name, func_scene_start ) {
         //Удаляем всё из слоёв отрисовки
         game.scene.layers.clear();
         
+        //Отключаем постобработку
+        game.postproc = function() { return; };
+        
         //Выгрузка ресурсов объектов сцены из оперативной памяти
         let scene_objects = Object.getOwnPropertyNames( game.scene.objects );
         for( let obj = 0; obj < scene_objects.length; obj++ ) {
@@ -369,36 +375,6 @@ function StartScene( scene_name, func_scene_start ) {
     for( let obj = 0; obj < scene_objects.length; obj++ ) {
         let object_name = scene_objects[ obj ];
         let object = scene.objects[ object_name ];
-        
-        //Добавление объекта на сцену
-        object.add = function() {
-            if( config.debug ) console.log( 'game.scene.add( "' + object_name + '" );' );
-            
-            //На случай импорта из другой сцены
-            if( game.scene.objects[ object_name ] === undefined ) {
-                game.scene.objects[ object_name ] = this;
-            }
-            
-            //Инициализируем объект
-            if( this.init !== undefined ) this.init();
-            
-            //Включаем отрисовку объекта
-            game.scene.layers.push( object_name );
-        };
-        
-        //Удаление объекта со сцены
-        object.del = function() {   
-            let obj_pos = game.scene.layers.indexOf( object_name );
-            if( obj_pos > -1 ) {
-                if( config.debug ) console.log( 'game.scene.del( "' + object_name + '" );' );
-                
-                //Удаляем из списка на отрисовку
-                game.scene.layers.splice( obj_pos, 1 );
-                
-                //Удаляем временные переменные
-                delete this.tmp;
-            }
-        };
         
         //Перебираем ресурсы объекта
         if( object.resources === undefined ) continue;
@@ -544,10 +520,7 @@ function UpdateScene() {
         if( game.scene.layers.length !== temp_ind  ) break;
     }
     
-    //Запускаем очередную отрисовку кадра, когда это будет удобно браузеру
-    window.requestAnimationFrame( DrawScene, game.canvas.id );
-    
-    //Запускаем очередную итерацию
+    //Запускаем очередную итерацию обновления сцены
     setTimeout( UpdateScene, game.delay );
 };
 
@@ -670,7 +643,7 @@ function DrawScene() {
     //Проверяем правильность ориентации экрана
     if( game.canvas.rotate === false) {
         //Отрисовка рамки
-        context.strokeStyle = '#2F2F2F';
+        context.strokeStyle = 'rgb(47,47,47)';
         context.lineWidth = 1;
         context.lineCap = 'butt';
         context.strokeRect( 0, 0, game.canvas.width, game.canvas.height );
@@ -688,7 +661,7 @@ function DrawScene() {
         
         //Отображение частоты кадров
         if( config.fps_show ) {
-            context.fillStyle = '#ababab';
+            context.fillStyle = 'rgb(171,171,171)';
             context.font = 'normal 8pt Arial';
             context.fillText( 'FPS: ' + game.fps, 598, 356 );
         }
@@ -699,7 +672,7 @@ function DrawScene() {
         let scale = Math.ceil( x_pos / 100 );
         let icon = tmp.rotate_icon;
         
-        context.strokeStyle = '#FFFFFF';
+        context.strokeStyle = 'rgb(255,255,255)';
         context.lineWidth = 4;
         context.lineCap = 'round';
         
@@ -729,6 +702,11 @@ function DrawScene() {
             context.lineTo( x_pos - scale * 20, y_pos - scale * 27 );
         context.stroke();
     }
+    
+    //Запускаем очередную отрисовку кадра, когда это будет удобно браузеру
+    setTimeout( function() {
+        window.requestAnimationFrame( DrawScene, game.canvas.id );
+    }, game.delay );
 };
 
 
@@ -782,7 +760,7 @@ function PixelFull( bytes, canvas_w, Rc, Gc, Bc, Ac, x, y, Rf, Gf, Bf, Af ) {
                 dir_left = false;
                 curr_x = tmp_x, curr_y = tmp_y;
             } else {
-                //Завершили движение направо, проверяем дошли ли до верха/низа фигуры
+                //Завершили движение направо, проверяем дошли ли до верха/низа контура
                 if( find_x === tmp_x  &&  find_y === tmp_y ) {
                     if( dir_top ) {
                         //Начинаем движение вниз от начальной точки
@@ -792,7 +770,7 @@ function PixelFull( bytes, canvas_w, Rc, Gc, Bc, Ac, x, y, Rf, Gf, Bf, Af ) {
                         op++;
                         continue;
                     } else {
-                        //Дошли до низа фигуры, завершаем перекрас
+                        //Дошли до низа контура, завершаем перекрас
                         break;
                     }
                 } else {
@@ -826,78 +804,167 @@ function PixelFull( bytes, canvas_w, Rc, Gc, Bc, Ac, x, y, Rf, Gf, Bf, Af ) {
     } while( op < 10000 );
 };
 
-//Функция отрисовки стандартного тела на холст
-function DrawBody( body, line_color, x, y ) {
+//Функция отрисовки по опорным точкам на временном холсте
+function DrawRefPoints( ref_points ) {
     //Получаем короткие ссылки
-    let context = game.canvas.context;
     let temp_context = game.temp_canvas.context;
+    let temp_canvas_w = game.temp_canvas.width;
+    let temp_canvas_h = game.temp_canvas.height;
     
     //Очищаем временный холст
-    temp_context.clearRect( 0, 0, game.temp_canvas.width, game.temp_canvas.height );
+    temp_context.clearRect( 0, 0, temp_canvas_w, temp_canvas_h );
     
-    //Копируем с него пустой кусок
-    let imageData = temp_context.getImageData( 0, 0, game.temp_canvas.width, game.temp_canvas.height );
+    //Копируем пиксельные данные с временного холста
+    let imageData = temp_context.getImageData( 0, 0, temp_canvas_w, temp_canvas_h );
     let imageBytes = imageData.data;
-    let canvas_w = game.temp_canvas.width;
     
-    //Рисуем на нем тело
-    let i, j;
-    let x0, y0, x1, y1;
-    let Rf, Gf, Bf, Af;
-    let Rc = line_color[ 0 ], Gc = line_color[ 1 ], Bc = line_color[ 2 ], Ac = line_color[ 3 ];
-    for( i = 0; i < body.length; i++ ) {
-        //Окантовка части тела
-        for( j = 6, points_len = body[ i ].length; j < points_len; j +=2 ) {
-            x0 = Math.floor( body[ i ][ j ] );
-            y0 = Math.floor( body[ i ][ j + 1 ] );
+    //Получаем цвет контура
+    let Rc = Math.floor( ref_points[ 0 ][ 0 ] );
+    let Gc = Math.floor( ref_points[ 0 ][ 1 ] );
+    let Bc = Math.floor( ref_points[ 0 ][ 2 ] );
+    let Ac = Math.floor( ref_points[ 0 ][ 3 ] );
+    
+    //Меняем цвет контура, для заливки поверх имеющихся конутров
+    let ref_len = ref_points.length;
+    let redshift = ( Rc + ref_len > 255 ? -1 : 1 );
+    
+    //Отрисовка по опорным точкам
+    for( let i = 1, j, x0, y0, x1, y1, Rf, Gf, Bf, Af, Rc_uniq, points_len; i < ref_len; i++ ) {
+        Rc_uniq = Rc + i * redshift;
+        
+        //Рисуем замкнутый контур
+        for( j = 7, points_len = ref_points[ i ].length; j < points_len; j +=2 ) {
+            //Получаем координаты линии
+            x0 = Math.floor( ref_points[ i ][ j ] );
+            y0 = Math.floor( ref_points[ i ][ j + 1 ] );
             if( j !== points_len - 2 ) {
-                x1 = Math.floor( body[ i ][ j + 2 ] );
-                y1 = Math.floor( body[ i ][ j + 3 ] );  
+                x1 = Math.floor( ref_points[ i ][ j + 2 ] );
+                y1 = Math.floor( ref_points[ i ][ j + 3 ] );  
             } else {
-                x1 = Math.floor( body[ i ][ 6 ] );
-                y1 = Math.floor( body[ i ][ 7 ] );  
+                //Предпоследнюю точку замыкаем с первой
+                x1 = Math.floor( ref_points[ i ][ 7 ] );
+                y1 = Math.floor( ref_points[ i ][ 8 ] );  
             }
             
-            PixelLine( imageBytes, canvas_w, Rc - i, Gc, Bc, Ac, x0, y0, x1, y1 );
+            //Рисуем линию попиксельно
+            PixelLine( imageBytes, temp_canvas_w, Rc_uniq, Gc, Bc, Ac, x0, y0, x1, y1 );
         }
         
-        //Заливка части тела
-        Rf = body[ i ][ 2 ];
-        Gf = body[ i ][ 3 ];
-        Bf = body[ i ][ 4 ];
-        Af = body[ i ][ 5 ];
-        PixelFull( imageBytes, canvas_w, Rc - i, Gc, Bc, Ac, body[ i ][ 0 ], body[ i ][ 1 ], Rf, Gf, Bf, Af );
+        //Получаем цвет заливки
+        Rf = Math.floor( ref_points[ i ][ 1 ] );
+        Gf = Math.floor( ref_points[ i ][ 2 ] );
+        Bf = Math.floor( ref_points[ i ][ 3 ] );
+        Af = Math.floor( ref_points[ i ][ 4 ] );
         
-        //Очистка верхнего ребра от окантовки (для основных частей тела)
-        if( i < 8 ) {
-            x0 = Math.floor( body[ i ][ points_len - 2 ] );
-            y0 = Math.floor( body[ i ][ points_len - 1 ] );
-            x1 = Math.floor( body[ i ][ 6 ] );
-            y1 = Math.floor( body[ i ][ 7 ] );
+        //Получаем коорданаты точки заливки
+        x0 = Math.floor( ref_points[ i ][ 5 ] );
+        y0 = Math.floor( ref_points[ i ][ 6 ] );
+        
+        //Заливаем замкнутый контур
+        PixelFull( imageBytes, temp_canvas_w, Rc_uniq, Gc, Bc, Ac, x0, y0, Rf, Gf, Bf, Af );
+        
+        //Очистка от окантовки между первой и второй точкой
+        if( ref_points[ i ][ 0 ] === 1 ) {
+            x0 = Math.floor( ref_points[ i ][ 7 ] );
+            y0 = Math.floor( ref_points[ i ][ 8 ] );
+            x1 = Math.floor( ref_points[ i ][ 9 ] );
+            y1 = Math.floor( ref_points[ i ][ 10 ] );
             
             //Чертим линию цвета заливки
-            PixelLine( imageBytes, canvas_w, Rf, Gf, Bf, Af, x0, y0, x1, y1 );
+            PixelLine( imageBytes, temp_canvas_w, Rf, Gf, Bf, Af, x0, y0, x1, y1 );
             
-            //Восстанавливаем крайние точки
-            j =  ( x0 + y0 * canvas_w ) * 4;
-            imageBytes[ j ] = Rc;
+            //Восстанавливаем контур крайних точек от заливки
+            j =  ( x0 + y0 * temp_canvas_w ) * 4;
+            imageBytes[ j ] = Rc_uniq;
             imageBytes[ j + 1 ] = Gc;
             imageBytes[ j + 2 ] = Bc;
             imageBytes[ j + 3 ] = Ac;
-            j =  ( x1 + y1 * canvas_w ) * 4;
-            imageBytes[ j ] = Rc;
+            j =  ( x1 + y1 * temp_canvas_w ) * 4;
+            imageBytes[ j ] = Rc_uniq;
             imageBytes[ j + 1 ] = Gc;
             imageBytes[ j + 2 ] = Bc;
             imageBytes[ j + 3 ] = Ac;
         }
     }
     
-    //Возвращаем на временный холст отрисованный кусок
+    //Вставляем на временный холст отредактированные пиксельные данные
     temp_context.putImageData( imageData, 0, 0 );
+};
+
+//Создание матрицы преобразований координат опорных точек между двумя состояниями, за нужное количество шагов
+function AnimateMatrix( ref_start, ref_end, frames_count ) {
+    let output = [];
     
-    //Копируем со временного холста на основной
-    game.canvas.context.drawImage( game.temp_canvas.id, x, y );
-}
+    for( let i = 1, j, ref_len = ref_start.length; i < ref_len; i++ ) {
+        output[ i ] = [];
+        for( j = 1, points_len = ref_start[ i ].length; j < points_len; j++ ) {
+            output[ i ].push( ( ref_end[ i ][ j ] - ref_start[ i ][ j ]  ) / frames_count );
+        }
+    }
+    
+    return output;
+};
+
+//Преобразование координат опорных точек согласно шагу
+function UpdateAnimation( _this ) {
+    let ref_points = _this.tmp.ref_points;
+    let play_manager = _this.play_manager;
+    
+    //Проверяем, требуется ли преобразование координат
+    if( play_manager.is_played === false ) return;
+    
+    //Проверяем, требуется ли пересчет матрицы преобразований
+    let update = false;
+    
+    //Изменился фреймрейт
+    if( play_manager.delay !== game.delay ) {
+        play_manager.delay = game.delay;
+        update = true;
+    }
+    
+    //Фаза анимации закончилась
+    if( play_manager.frame === play_manager.frames_count ) {
+        //Переключаем на следующую фазу анимации
+        play_manager.phase++;
+        play_manager.phase_count--;
+        update = true;
+        
+        //Больше фаз нет
+        if( play_manager.phase === play_manager.animation.length  ||  play_manager.phase_count === 0 ) {
+            //Перезапускаем анимацию сначала
+            if( play_manager.loop === true  ||  play_manager.phase_count > 0 ) {
+                play_manager.phase = 0;
+            } else if ( play_manager.phase_ending !== null ) {
+                //Проигрываем последнюю фазу
+                play_manager.phase = play_manager.phase_ending;
+                play_manager.phase_ending = null;
+                play_manager.phase_count = 1;
+            } else {
+                //Останавливаем анимацию
+                play_manager.is_played = false;
+                update = false;
+            }
+        }
+    }
+    
+    //Пересчет матрицы преобразований
+    if( update ) {
+        play_manager.frame = 0;
+        play_manager.frames_count = Math.floor( play_manager.animation[ play_manager.phase ][ 0 ][ 4 ] / play_manager.delay );
+        play_manager.matrix = AnimateMatrix( ref_points, play_manager.animation[ play_manager.phase ], play_manager.frames_count );
+    }
+    
+    //Преобразование координат
+    if( play_manager.is_played ) {
+        play_manager.frame++;
+        for( let i = 1; i < ref_points.length; i++ ) {
+            for( let j = 1, points_len = ref_points[ i ].length; j < points_len; j +=2 ) {
+                ref_points[ i ][ j ] += play_manager.matrix[ i ][ j - 1 ];
+                ref_points[ i ][ j + 1 ] += play_manager.matrix[ i ][ j ];
+            }
+        }
+    }
+};
 
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
@@ -912,28 +979,104 @@ function GameInit() {
         return;
     }
     
+    //---------------------------------------------------------------------------------------------
+    //Автоматическое добавление методов и параметров ----------------------------------------------
+    //---------------------------------------------------------------------------------------------
+    
     //Перебираем сцены
     let scenes_names = Object.getOwnPropertyNames( scenes );
     for( let scn = 0; scn < scenes_names.length; scn++ ) {
         let scene_name = scenes_names[ scn ];
+        let scene = scenes[ scene_name ];
         
         //Добавляем на сцену её название
-        scenes[ scenes_names[ scn ] ].name = scene_name;
+        scene.name = scene_name;
         
         //Добавляем на сцену массив отрисовки
-        scenes[ scenes_names[ scn ] ].layers = [];
+        scene.layers = [];
         
         //Добавляем функцию корректной очистки массива отрисовки
-        scenes[ scenes_names[ scn ] ].layers.clear = function() {
+        scene.layers.clear = function() {
             for( let i = 0, layers = game.scene.layers.length; i < layers; i++ ) {
                 //Удаляем объекты в обратном порядке
                 if( game.scene.layers.length > 0 ) game.scene.objects[ game.scene.layers[ game.scene.layers.length - 1 ] ].del();
             }
         };
+        
+        //Перебираем объекты сцены
+        let scene_objects_names = Object.getOwnPropertyNames( scene.objects );
+        for( let obj = 0; obj < scene_objects_names.length; obj++ ) {
+            let object_name = scene_objects_names[ obj ];
+            let object = scene.objects[ object_name ];
+            
+            //Добавление объекта на сцену
+            object.add = function() {
+                if( config.debug ) console.log( 'game.scene.add( "' + object_name + '" );' );
+                
+                //На случай импорта из другой сцены
+                if( game.scene.objects[ object_name ] === undefined ) {
+                    game.scene.objects[ object_name ] = this;
+                }
+                
+                //Инициализируем объект
+                if( this.init !== undefined ) this.init();
+                
+                //Включаем отрисовку объекта
+                game.scene.layers.push( object_name );
+            };
+            
+            //Удаление объекта со сцены
+            object.del = function() {
+                let obj_pos = game.scene.layers.indexOf( object_name );
+                if( obj_pos > -1 ) {
+                    if( config.debug ) console.log( 'game.scene.del( "' + object_name + '" );' );
+                    
+                    //Удаляем из списка на отрисовку
+                    game.scene.layers.splice( obj_pos, 1 );
+                    
+                    //Удаляем временные переменные
+                    delete this.tmp;
+                }
+            };
+            
+            //Управление анимацией
+            if( object.animations !== undefined ) {
+                object.play_manager = {
+                    animation: null,
+                    delay: game.delay,
+                    phase: 0,
+                    phase_count: 0,
+                    phase_ending: null,
+                    frame: 0,
+                    frames_count: 0,
+                    loop: false,
+                    delay: game.delay,
+                    matrix: [],
+                    is_played: false
+                };
+                
+                //Создаем методы для управления анимацией
+                object.play = function( animation, phase_ms = 0, loop = false, phase = 0, phase_count = 0, phase_ending = null ) {
+                    let manager = this.play_manager;
+                    manager.animation = animation;
+                    manager.delay = game.delay;
+                    manager.phase = phase;
+                    manager.phase_count = ( phase_count === 0 ? animation.length : phase_count );
+                    manager.phase_ending = phase_ending;
+                    manager.frame = 0;
+                    manager.frames_count = Math.floor( ( phase_ms === 0 ? 500 : animation[ phase ][ 0 ][ 4 ] ) / manager.delay );
+                    manager.loop = loop;
+                    manager.matrix = AnimateMatrix( this.tmp.ref_points, animation[ phase ], manager.frames_count );
+                    manager.is_played = true;
+                };
+            }
+        }
     }
+    
     //---------------------------------------------------------------------------------------------
     //localStorage --------------------------------------------------------------------------------
     //---------------------------------------------------------------------------------------------
+    
     try {
         let test = 'test';
         localStorage.setItem( test, test );
@@ -958,9 +1101,12 @@ function GameInit() {
         }
     } );
     
+    
+    
     //---------------------------------------------------------------------------------------------
     //Canvas --------------------------------------------------------------------------------------
     //---------------------------------------------------------------------------------------------
+    
     //Основной холст
     game.canvas.id = document.getElementById( 'canvas' );
     game.canvas.width = game.canvas.id.width;
@@ -974,6 +1120,7 @@ function GameInit() {
     game.temp_canvas.height = game.temp_canvas.height;
     if( !( game.temp_canvas.id.getContext  &&  game.temp_canvas.id.getContext( '2d' ) ) ) return InitError( 'canvas' );
     game.temp_canvas.context = game.temp_canvas.id.getContext( '2d', { antialias: false, alpha: true } );
+    game.temp_canvas.drawRefPoints = DrawRefPoints;
     
     //Проверяем доступность тача
     if( 'ontouchstart' in document.documentElement ) {
@@ -1028,9 +1175,12 @@ function GameInit() {
         e.preventDefault ? e.preventDefault() : (e.returnValue = false);
     }, false );
     
+    
+    
     //---------------------------------------------------------------------------------------------
     //Keyboard ------------------------------------------------------------------------------------
     //---------------------------------------------------------------------------------------------
+    
     document.body.addEventListener ( 'keydown', function( e ) {
         switch( e.keyCode ) {
             case 9: //Tab
@@ -1039,16 +1189,16 @@ function GameInit() {
                 e.preventDefault ? e.preventDefault() : (e.returnValue = false);
             break;
             
-            case 107: //Плюс
-                game.keyboard.plus++;
+            case 16: //Shift
+                game.keyboard.shift = true;
             break;
             
-            case 109: //Минус
-                game.keyboard.minus++;
+            case 33: //Page Up
+                game.keyboard.page_up++;
             break;
             
-            case 39: //Вправо
-                game.keyboard.right++;
+            case 34: //Page Down
+                game.keyboard.page_down++;
             break;
             
             case 37: //Влево
@@ -1059,12 +1209,24 @@ function GameInit() {
                 game.keyboard.up++;
             break;
             
+             case 39: //Вправо
+                game.keyboard.right++;
+            break;
+            
             case 40: //Вниз
                 game.keyboard.down++;
             break;
             
-            case 16: //Shift
-                game.keyboard.shift = true;
+            case 46: //Delete
+                game.keyboard.del++;
+            break;
+            
+            case 107: //Плюс
+                game.keyboard.plus++;
+            break;
+            
+            case 109: //Минус
+                game.keyboard.minus++;
             break;
         }
     }, false );
@@ -1077,9 +1239,12 @@ function GameInit() {
         }
     }, false );
     
+    
+    
     //---------------------------------------------------------------------------------------------
     //Blob & createObjectURL ----------------------------------------------------------------------
     //---------------------------------------------------------------------------------------------
+    
     if( ( function() {
             try {
                 return !!new Blob();
@@ -1089,12 +1254,15 @@ function GameInit() {
         }
         )() === false
     ) return InitError( 'Blob' );
+    
     if ( !( window.URL && window.URL.createObjectURL ) ) return InitError( 'createObjectURL' );
+    
     
     
     //---------------------------------------------------------------------------------------------
     //Sound ---------------------------------------------------------------------------------------
     //---------------------------------------------------------------------------------------------
+    
     let mp3audio  = document.createElement( 'audio' );
     game.audio.mp3_support = !!( mp3audio.canPlayType  &&  mp3audio.canPlayType( 'audio/mpeg;' ).replace( /no/, '' ) );
     
@@ -1132,8 +1300,10 @@ function GameInit() {
     };
     tmp.loading = [ 1, 4,  1, 9,  1, 14,  0, 20 ];
     
+    
+    
     //---------------------------------------------------------------------------------------------
-    //---------------------------------------------------------------------------------------------
+    //Запуск игры ---------------------------------------------------------------------------------
     //---------------------------------------------------------------------------------------------
     
     //Запускаем сцену загрузки ресурсов
@@ -1144,12 +1314,13 @@ function GameInit() {
     
     //Включаем обновление и отрисовку объектов
     setTimeout( UpdateScene, game.delay );
+    window.requestAnimationFrame( DrawScene, game.canvas.id );
     
     //Запускаем загрузкy внешних ресурсов
     LoadResources();
 };
-//-------------------------------------------------------------------------------------------------
 
+//-------------------------------------------------------------------------------------------------
 
 //Начинаем инициализировать игровой движок, как только страница загрузилась полностью
 document.onreadystatechange = function() {
