@@ -8,7 +8,7 @@ scenes.final = {
         background: {
             //Ресурсы объекта ---------------------------------------------------------------------
             resources: {
-                autos:    { type: 'image', src: '/res/final/autos.png' },
+                autos:   { type: 'image', src: '/res/final/autos.png' },
                 street:  { type: 'image', src: '/res/final/street.png' },
                 objects: { type: 'image', src: '/res/final/objects.png' }
             },
@@ -165,13 +165,13 @@ scenes.final = {
                 hand: [
                     [
                         [255,255,255,255,100],
-                        [0,0,0,0,255,74,124,75,117,71,117,69,124,69,128,74,134,78,132,78,128,79,122],
-                        [1,0,0,0,255,75,73,81,69,68,70,69,89,69,94,69,100,68,112,69,119,78,118,80,97,81,85]
+                        [0,0,0,0,255,74,124,74,117,70,117,68,124,68,128,73,134,77,132,77,128,78,122],
+                        [1,0,0,0,255,74,72,81,69,67,67,68,79,67,89,67,94,68,102,68,112,68,119,77,118,78,107,79,97,80,86,81,78]
                     ],
                     [
                         [255,255,255,255,100],
-                        [0,0,0,0,255,44,107,45,100,41,100,39,107,39,111,44,117,48,115,48,111,49,105],
-                        [1,0,0,0,255,45,57,52,57,43,50,31,64,27,72,26,78,35,84,49,86,49,78,37,74,44,67]
+                        [0,0,0,0,255,74,94,74,87,70,87,68,94,68,98,73,104,77,102,77,98,78,92],
+                        [1,0,0,0,255,74,72,80,71,67,67,54,69,45,71,44,76,50,82,60,87,68,91,76,89,73,83,66,78,56,78,74,77]
                     ]
                 ]
             },
@@ -184,13 +184,13 @@ scenes.final = {
                     y: 200,
                     rotation: 0,
                     ref_points: JSON.parse( JSON.stringify( this.animations.menu[ 0 ] ) ),
-                    mouse_x: game.cursor.pos_x,
-                    mouse_y: game.cursor.pos_y,
+                    pos_x: game.cursor.pos_x,
+                    pos_y: game.cursor.pos_y,
                     hand: {
                         enable: true,
                         x: 0,
                         y: -18,
-                        drag_x: this.animations.hand[ 0 ][ 1 ][ 5 ] - 15,
+                        drag_x: this.animations.hand[ 0 ][ 1 ][ 5 ] - 10,
                         drag_y: this.animations.hand[ 0 ][ 1 ][ 6 ] - 10,
                         pressed: false,
                         line_a: [ 
@@ -199,21 +199,12 @@ scenes.final = {
                             this.animations.hand[ 0 ][ 2 ][ 5 ],
                             this.animations.hand[ 0 ][ 2 ][ 6 ]
                         ],
-                        line_b: [
-                            this.animations.hand[ 0 ][ 2 ][ 5 ],
-                            this.animations.hand[ 0 ][ 2 ][ 6 ],
-                            100,
-                            100
-                        ],
-                        angle: 0.1,
-                        new_angle: 0,
-                        offset: 1,
+                        angle: Math.PI,
+                        offset: 0,
                         ref_points: JSON.parse( JSON.stringify( this.animations.hand[ 0 ] ) ),
                         matrix: AnimateMatrix( this.animations.hand[ 0 ], this.animations.hand[ 1 ], 30 )
                     }
                 };
-                
-                //this.play( this.animations.menu, 100, true );
             },
             
             //Обновление объекта ------------------------------------------------------------------
@@ -229,64 +220,54 @@ scenes.final = {
                 if( hand.enable === false ) return;
                 
                 //Клик по руке
-                let pos_x = 0, pos_y = 0, angle, offset;
+                let pos_x = game.cursor.pos_x;
+                let pos_y = game.cursor.pos_y;
                 let drag_x = ltmp.x + hand.x + hand.drag_x;
                 let drag_y = ltmp.y + hand.y + hand.drag_y;
-                let click = false;
-                if( game.cursor.pos_x === game.cursor.click_x  &&  game.cursor.pos_y === game.cursor.click_y ) {
-                    //Преобразуем в кординаты холста
-                    pos_x = Math.ceil( game.cursor.pos_x / game.canvas.scale );
-                    pos_y = Math.ceil( game.cursor.pos_y / game.canvas.scale );
-                    
-                    //Детектируем клик по руке
-                    if( pos_x > drag_x && pos_x < drag_x + 30 && pos_y > drag_y && pos_y <  drag_y + 30 ) {
-                        //Клик захвачен, зануляем коордианты
-                        game.cursor.click_x = 0;
-                        game.cursor.click_y = 0;
-                        
-                        //Захватываем руку
-                        hand.pressed = true;
-                    }
+                
+                //Проверяем наличие клика на объекте
+                let click = ClickDetect( drag_x, drag_y, 20, 20 );
+                
+                //Захват руки
+                if( click && game.cursor.pressed ) {
+                    hand.pressed = true;
+                } else if( hand.pressed && game.cursor.pressed === false ) {
+                    hand.pressed = false;
                 }
                 
-                //Проверяем, существует ли еще захват руки
-                if( hand.pressed === true && game.cursor.pressed === false ) hand.pressed = false;
-                
-                //Движение руки
-                if( hand.pressed && ( ltmp.mouse_x !== game.cursor.pos_x || ltmp.mouse_y !== game.cursor.pos_y ) ) {
+                //Движение мыши
+                if( hand.pressed && ( ltmp.pos_x !== pos_x || ltmp.pos_y !== pos_y ) ) {
                     //Сохраняем координаты мыши
-                    ltmp.mouse_x = game.cursor.pos_x;
-                    ltmp.mouse_y = game.cursor.pos_y;
+                    ltmp.pos_x = pos_x;
+                    ltmp.pos_y = pos_y;
                     
-                    //Преобразуем в кординаты холста
-                    pos_x = Math.ceil( ltmp.mouse_x / game.canvas.scale );
-                    pos_y = Math.ceil( ltmp.mouse_y / game.canvas.scale );
+                    let angle, offset;
                     
-                    hand.line_b[ 2 ] = pos_x;
-                    hand.line_b[ 3 ] = pos_y;
-                    
-                    //Вычисляем угол относительно тела
+                    //Вычисляем угол относительно тела --------------------------------------------
                     let line_a = [
-                        ltmp.x + hand.line_a[ 0 ], ltmp.y + hand.line_a[ 1 ],
-                        ltmp.x + hand.line_a[ 2 ], ltmp.y + hand.line_a[ 3 ]
+                        ltmp.x + hand.x + hand.line_a[ 0 ], ltmp.y + hand.y + hand.line_a[ 1 ],
+                        ltmp.x + hand.x + hand.line_a[ 2 ], ltmp.y + hand.y + hand.line_a[ 3 ]
                     ];
                     let vector_a = [ line_a[ 2 ] - line_a[ 0 ], line_a[ 3 ] - line_a[ 1 ] ];
                     
+                    //Ограничиваем заход руки заспину
+                    if( pos_x < line_a[ 2 ] ) pos_x = line_a[ 2 ];
+                    
                     let line_b = [ 
-                        ltmp.x + hand.line_b[ 0 ], ltmp.y + hand.line_b[ 1 ],
-                        hand.line_b[ 2 ], hand.line_b[ 3 ]
+                        line_a[ 2 ], line_a[ 3 ],
+                        pos_x, pos_y
                     ];
                     let vector_b = [ line_b[ 2 ] - line_b[ 0 ], line_b[ 3 ] - line_b[ 1 ] ];
                     
                     let cross = vector_a[ 0 ] * vector_b[ 1 ] - vector_a[ 1 ] * vector_b[ 0 ];
                     let dot = vector_a[ 0 ] * vector_b[ 0 ] + vector_a[ 1 ] * vector_b[ 1 ];
                     
-                    hand.new_angle = Math.atan2( cross, dot );
+                    angle = Math.atan2( cross, dot );
                     
-                    angle = hand.new_angle;
-                    
-                    //Вычисляем расстояние руки до тела
-                    offset = 1;
+                    //Вычисляем расстояние от ладони до плеча -------------------------------------
+                    offset =  Math.max( Math.abs( pos_x - line_a[ 2 ] ) , Math.abs( pos_y - line_a[ 3 ] ) );
+                    if( offset > 50 ) offset = 50;
+                    if( offset < 20 ) offset = 20;
                 
                     if( angle !== hand.angle  ||  offset !== hand.offset ) {
                         hand.angle = angle;
@@ -294,8 +275,11 @@ scenes.final = {
                         
                         let ref_source = this.animations.hand[ 0 ];
                         let ref_points = hand.ref_points;
+                        let ref_matrix = ltmp.hand.matrix;
+                        let frame = 50 - offset;
                         
-                        let cos = -Math.cos( angle);
+                        //Меняем угол относительно тела
+                        let cos = -Math.cos( angle );
                         let sin = -Math.sin( angle );
                         
                         //Получаем координаты точки заливки (вращать будем вокруг неё)
@@ -304,11 +288,11 @@ scenes.final = {
                         
                         for( let i = 1, j, x, y, ref_len = ref_source.length; i < ref_len; i++ ) {
                             for( let j = 5, points_len = ref_source[ i ].length; j < points_len; j += 2 ) {
-                                //Получаем опорную точку
-                                x = ref_source[ i ][ j ];
-                                y = ref_source[ i ][ j + 1 ];
+                                //Получаем опорную точку согласно матрице преобразований
+                                x = ref_source[ i ][ j ] + frame * ref_matrix[ i ][ j - 1 ];
+                                y = ref_source[ i ][ j + 1 ] + frame * ref_matrix[ i ][ j ];
                                 
-                                //Преобразуем координаты
+                                //Вращаем опорную точку относительно точки заливки
                                 ref_points[ i ][ j ] = ( cos * ( x - Fx ) ) - ( sin * ( y - Fy ) ) + Fx;
                                 ref_points[ i ][ j + 1 ] = ( sin * ( x - Fx ) ) + ( cos * ( y - Fy ) ) + Fy;
                             }
@@ -319,8 +303,8 @@ scenes.final = {
                         ref_source[ 2 ][ 6 ] = Fy;
                         
                         //Обновляем координаты захвата
-                        hand.drag_x = Math.floor( ref_points[ 1 ][ 5 ] - 15 );
-                        hand.drag_y = Math.floor( ref_points[ 1 ][ 6 ] - 15 );
+                        hand.drag_x = Math.floor( ref_points[ 1 ][ 5 ] - 10 );
+                        hand.drag_y = Math.floor( ref_points[ 1 ][ 6 ] - 10 );
                     }
                 }
             },
@@ -342,29 +326,43 @@ scenes.final = {
                 game.temp_canvas.drawRefPoints( hand.ref_points );
                 //Копируем временный холст на основной
                 context.drawImage( game.temp_canvas.id, ltmp.x + hand.x, ltmp.y + hand.y );
-                
-                /*
-                context.fillStyle = 'rgba(255,255,255,0.1)';
-                context.fillRect( ltmp.x + hand.x + hand.drag_x, ltmp.y + hand.y + hand.drag_y, 30, 30 );
-                
-                
-                context.fillStyle = 'rgb(255,255,255)';
-                context.font = 'normal 7pt Arial';
-                context.fillText( 'angle: ' + (hand.new_angle * 180 / Math.PI ) + ' (' + hand.new_angle + ')', 100, 100 );
-                
-                
-                context.strokeStyle = 'rgb(255,255,255)';
-                context.beginPath();
-                context.moveTo( ltmp.x + hand.x + hand.line_a[ 0 ], ltmp.y + hand.y + hand.line_a[ 1 ] );
-                context.lineTo( ltmp.x + hand.x + hand.line_a[ 2 ], ltmp.y + hand.y + hand.line_a[ 3 ] );
-                context.stroke();
-                
-                context.beginPath();
-                context.moveTo( ltmp.x + hand.x + hand.line_b[ 0 ], ltmp.y + hand.y + hand.line_b[ 1 ] );
-                context.lineTo( hand.line_b[ 2 ], hand.line_b[ 3 ] );
-                context.stroke();
-                */
             }
-        }
+        },
+        
+        //-----------------------------------------------------------------------------------------
+        //Дождь -----------------------------------------------------------------------------------
+        //-----------------------------------------------------------------------------------------
+        rain: {
+            //Ресурсы объекта ---------------------------------------------------------------------
+            resources: {
+                rain:    { type: 'image', src: '/res/postproc/rain.png' }
+            },
+            
+            //Инициализация объекта ---------------------------------------------------------------
+            init: function() {
+                //Создаем временные переменные
+                this.tmp = {
+                    offset: 0,
+                    draw_ts: tmp.draw_ts,
+                    img_rain: game.scene.objects.rain.resources.rain.data
+                };
+            },
+            
+            //Обновление объекта ------------------------------------------------------------------
+            update: function() {},
+            
+            //Отрисовка объекта -------------------------------------------------------------------
+            draw: function() {
+                //Получаем короткие ссылки
+                let ltmp = this.tmp;
+                let context = game.canvas.context;
+                let img_rain = ltmp.img_rain;
+                
+                ltmp.offset += Math.floor( ( tmp.draw_ts - ltmp.draw_ts ) / 2 );
+                ltmp.draw_ts = tmp.draw_ts;
+                if ( ltmp.offset  > 200 ) ltmp.offset  = 0;
+                context.drawImage( img_rain, 0, 200 - ltmp.offset, 640, 360, 0, 0, 640, 360 );
+            }
+        },
     }
 };

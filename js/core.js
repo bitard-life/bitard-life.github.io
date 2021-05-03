@@ -1,27 +1,30 @@
 //-------------------------------------------------------------------------------------------------
 var config = {
-    //Ограничение максимального фпс
-    fps_max: 30,
-    
-    //Включает отображение фпс
-    fps_show: false,
-    
-    //Включает постобработку
-    post_proc: true,
-    
-    //Полноэкранный режим
+    //Во весь экран
     fullscreen: false,
     
-    //Разрешение
+    //Постобработка
+    post_proc: true,
+    
+    //Масштаб экрана
     resolution: 0,
     
-    //Громкость
-    volume: 60,
+    //Ограничить FPS
+    fps_max: 30,
     
-    //Текущий прогресс в прохождении
+    //Плавающий FPS
+    fps_nofix: true,
+    
+    //Показывать FPS
+    fps_show: false,
+    
+    //Громкость
+    sound_volume: 66,
+    
+    //Последний чекпоинт
     checkpoint: 0,
     
-    //Включает вывод в консоль отладотчной информации
+    //Вывод в консоль отладочной информации
     debug: true
 };
 
@@ -30,40 +33,130 @@ var config = {
 var scenes = {
     //Сцена заглушка
     empty: {
-        resources: {},
-        layers: [],
+        //Объекты сцены ---------------------------------------------------------------------------
         objects: {}
     },
     
-    //Лол, сцена при загрузке уровня
-    loading: {
-        resources: {},
-        layers: [ 'animation' ],
+    //Сцена со всяким полезным
+    other: {
+        //Объекты сцены ---------------------------------------------------------------------------
         objects: {
-            animation: {
-                draw: function() {
-                    let context = game.canvas.context;
-                    let iter = tmp.loading;
-                    let x = Math.ceil( game.canvas.width  / 2 ) - 40;
-                    let y = Math.ceil( ( game.canvas.height + game.canvas.hidden_h ) / 2 ) - 10;
-                    
-                    context.clearRect( 0, 0, game.canvas.width, game.canvas.height );
-                    context.fillStyle = 'rgb(188,188,188)';
-                    
-                    for( let i = 0, w = 4; i < 4; i++ ) {
-                        if( iter[ i * 2 + 1 ] == 4 ) {
-                            iter[ i * 2 ] = 1;
-                        } else if( iter[ i * 2 + 1 ] == 20 ) {
-                            iter[ i * 2 ] = 0;
-                        }
-                        w = iter[ i * 2 + 1 ] += ( iter[ i * 2 ] == 0 ? -1 : 1 );
-                        context.fillRect( x + 4 + i * 20, y + 4 - Math.ceil( w / 2 ), w, w );
+            //-------------------------------------------------------------------------------------
+            //Лол, анимация загрузки ресурсов в оперативную память --------------------------------
+            //-------------------------------------------------------------------------------------
+            loading: {
+                //Инициализация объекта -----------------------------------------------------------
+                init: function() {
+                    //Создаем временные переменные
+                    this.tmp = {
+                        x: Math.ceil( game.canvas.width  / 2 ) - 40 + 4,
+                        y: Math.ceil( ( game.canvas.height + game.canvas.hidden_h ) / 2 ) - 10 + 4,
+                        update_sync: 0,
+                        draw_sync: 0,
+                        wait_sec: Math.floor( 1000 / game.delay ),
+                        state: [ 1, 4,  1, 9,  1, 14,  0, 20 ]
                     }
                 },
-                update: function() {}
+                
+                //Обновление объекта --------------------------------------------------------------
+                update: function() {
+                    //Получаем короткие ссылки
+                    let ltmp = this.tmp;
+                    let state = ltmp.state;
+                    
+                    //Обновляем состояние анимации
+                    if( ltmp.update_sync !== ltmp.draw_sync ) {
+                        ltmp.update_sync = ltmp.draw_sync;
+                        
+                        for( let i = 0; i < 4; i++ ) {
+                            if( state[ i * 2 + 1 ] == 4 ) {
+                                state[ i * 2 ] = 1;
+                            } else if( state[ i * 2 + 1 ] == 20 ) {
+                                state[ i * 2 ] = 0;
+                            }
+                            state[ i * 2 + 1 ] += ( state[ i * 2 ] == 0 ? -1 : 1 );
+                        }
+                    }
+                },
+                
+                //Отрисовка объекта ---------------------------------------------------------------
+                draw: function() {
+                    //Получаем короткие ссылки
+                    let ltmp = this.tmp;
+                    let context = game.canvas.context;
+                    let state = ltmp.state;
+                    
+                    //Запро обновления
+                    ltmp.draw_sync++;
+                    
+                    //Ждем секунду перед показом анимации
+                    if( ltmp.draw_sync < ltmp.wait_sec ) return;
+                        
+                    //Отрисовываем состояние анимации
+                    context.fillStyle = 'rgb(188,188,188)';
+                    for( let i = 0, w; i < 4; i++ ) {
+                        w = state[ i * 2 + 1 ];
+                        context.fillRect( ltmp.x + i * 20, ltmp.y - Math.floor( w / 2 ), w, w );
+                    }
+                },
+                
+            },
+            
+            //-------------------------------------------------------------------------------------
+            //Постобработка кадра -----------------------------------------------------------------
+            //-------------------------------------------------------------------------------------
+            postproc: {
+                //Ресурсы объекта -----------------------------------------------------------------
+                resources: {
+                    noise:    { type: 'image', src: '/res/postproc/noise.png' },
+                    gradient: { type: 'image', src: '/res/postproc/gradient.png' }
+                },
+                
+                //Включение постобработки ---------------------------------------------------------
+                enable: function() {
+                    //Создаем временные переменные
+                    this.tmp = {
+                        noise: [],
+                        noise_i: 0,
+                        draw_ts: tmp.draw_ts,
+                        img_noise: game.scene.objects.postproc.resources.noise.data,
+                        img_gradient: game.scene.objects.postproc.resources.gradient.data
+                    }
+                    
+                    //Создаем случайный шум
+                    for( let i = 0; i < 200; i++ ) {
+                        this.tmp.noise.push( Math.floor( Math.random() * 180 ) );
+                        this.tmp.noise.push( 180 + Math.floor( Math.random() * 180 ) );
+                    }
+                    
+                    //Замещаем функцию постобработки
+                    game.postproc = game.scene.objects.postproc.draw;
+                },
+                
+                //Выключение постобработки --------------------------------------------------------
+                disable: function() {
+                    //Замещаем функцию постобработки
+                    game.postproc = function() { return; };
+                },
+                
+                //Постобработка кадра -------------------------------------------------------------
+                draw: function() {
+                    //Получаем короткие ссылки
+                    let ltmp = game.scene.objects.postproc.tmp;
+                    let context = game.canvas.context;
+                    
+                    //Градиент
+                    context.drawImage( ltmp.img_gradient, 0, 0 );
+                    
+                    //Шум (20fps)
+                    if( tmp.draw_ts - ltmp.draw_ts > 50 ) {
+                        ltmp.draw_ts = tmp.draw_ts;
+                        ltmp.noise_i = ( ltmp.noise_i == 399 ? 0 : ltmp.noise_i + 1);
+                    }
+                    context.drawImage( ltmp.img_noise, 0,ltmp.noise[ ltmp.noise_i ], 640,360, 0,0, 640,360 );
+                }
             }
         }
-
     }
 };
 
@@ -118,6 +211,7 @@ var game = {
         click_x: 0,
         click_y: 0,
         wheel: 0,
+        touch: 0,
         pressed: false
     },
     
@@ -305,10 +399,9 @@ function LoadResources() {
 };
 
 //Запуск сцены ------------------------------------------------------------------------------------
-function StartScene( scene_name, func_scene_start ) {
+function StartScene( scene_name ) {
     let scene = scenes[ scene_name ];
     if( scene === undefined ) return;
-    
     
     let scene_resource_all = 0;
     let scene_resource_loaded = 0;
@@ -361,14 +454,12 @@ function StartScene( scene_name, func_scene_start ) {
         }
     
         if( config.debug ) console.log( 'StopScene( "' + game.scene.name + '" ); -> Все ресурсы выгружены из памяти.' );
-        
-        //Включаем сцену "загрузки сцены"
-        game.scene = scenes.loading;
     }
     
     if( config.debug ) console.log( 'StartScene( "' + scene_name + '" );' );
     
-    
+    //Добавляем анимацию загрузки сцены
+    game.scene.objects.loading.add();
     
     //Перебираем объекты сцены
     let scene_objects = Object.getOwnPropertyNames( scene.objects );
@@ -486,11 +577,14 @@ function StartScene( scene_name, func_scene_start ) {
             //Удаляем таймер
             clearInterval( tmp.timerLoadScene );
             
+            //Удаляем анимацию загрузки
+            game.scene.objects.loading.del();
+            
             //Запускаем сцену
             game.scene = scene;
             
-            //Вызываем коллбэк
-            func_scene_start();
+            //Инициализируем сцену
+            if( game.scene.init !== undefined ) game.scene.init();
         }
     }, 500 );
 };
@@ -507,9 +601,9 @@ function UpdateScene() {
     }
     
     //Изменяем уровень звука, если нужно
-    if( config.volume !== tmp.volume ) {
-        game.audio.gain.gain.value = parseFloat( ( config.volume / 100 ).toFixed( 1 ) );
-        tmp.volume = config.volume;
+    if( config.sound_volume !== tmp.sound_volume ) {
+        game.audio.gain.gain.value = parseFloat( ( config.sound_volume / 100 ).toFixed( 1 ) );
+        tmp.sound_volume = config.sound_volume;
     }
     
     //Обновляем объекты сцены( с конца )
@@ -522,6 +616,11 @@ function UpdateScene() {
     
     //Запускаем очередную итерацию обновления сцены
     setTimeout( UpdateScene, game.delay );
+    
+    //Запускаем очередную итерацию отрисовки сцены (при фиксированном fps или переключении на плавающий fps)
+    if( config.fps_nofix === false || ( tmp.reqAnimFrame === false && config.fps_nofix === true ) ) {
+        DrawScene();
+    }
 };
 
 //Цикл отрисовки сцены ----------------------------------------------------------------------------
@@ -703,10 +802,13 @@ function DrawScene() {
         context.stroke();
     }
     
-    //Запускаем очередную отрисовку кадра, когда это будет удобно браузеру
-    setTimeout( function() {
-        window.requestAnimationFrame( DrawScene, game.canvas.id );
-    }, game.delay );
+    //Запускаем очередную отрисовку кадра (при плавающем fps - когда это будет удобно браузеру)
+    if( config.fps_nofix === true ) {
+        if( tmp.reqAnimFrame === false ) tmp.reqAnimFrame = true;
+        setTimeout( function() {
+            window.requestAnimationFrame( DrawScene, game.canvas.id );
+        }, game.delay );
+    }
 };
 
 
@@ -966,6 +1068,26 @@ function UpdateAnimation( _this ) {
     }
 };
 
+//Функция захвата клика по объекту (попадание в прямоугольник)
+function ClickDetect( x, y, width, height ) {
+    let pos_x = game.cursor.pos_x;
+    let pos_y = game.cursor.pos_y;
+    
+    //Детектируем клик
+    if( pos_x === game.cursor.click_x  &&  pos_y === game.cursor.click_y ) {
+        //Проверяем попадание
+        if( pos_x > x && pos_x <  x + width  &&  pos_y > y && y <  y + height ) {
+            //Клик захвачен, смещаем координаты
+            game.cursor.click_x = -1;
+            game.cursor.click_y = -1;
+            
+            return true;
+        }
+    }
+    
+    return false;
+}
+
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------
@@ -977,6 +1099,24 @@ function GameInit() {
         document.getElementById( 'error_text' ).innerHTML = 'Ваш браузер не поддерживает ' + msg + '!';
         console.log( msg );
         return;
+    }
+    
+    //Мегакостыль для разрешения звука и полного экрана на странице (ничего не придумал лучше)
+    function MegaKostyl() {
+        //Разрешаем аудио на странице
+        if( game.audio.enabled === false ) {
+            game.audio.enabled = true;
+            game.audio.context.resume();
+        }
+        
+        //Включаем/выключаем полный экран
+        if( game.scene.objects.settings !== undefined  &&  game.scene.objects.settings.tmp !== undefined ) {
+            //Включение/выключение полного экрана в настройках
+            game.scene.objects.settings.update();
+        } else if( game.scene.objects.disclaimer !== undefined  &&  game.scene.objects.disclaimer.tmp !== undefined ) {
+            //Включаем полный экран через нажатие на дисклеймер (если так было сохранено в конфиге)
+            game.scene.objects.disclaimer.update();
+        }
     }
     
     //---------------------------------------------------------------------------------------------
@@ -1002,6 +1142,9 @@ function GameInit() {
                 if( game.scene.layers.length > 0 ) game.scene.objects[ game.scene.layers[ game.scene.layers.length - 1 ] ].del();
             }
         };
+        
+        //Добаляем на сцену объект анимации загрузки
+        scene.objects.loading = scenes.other.objects.loading;
         
         //Перебираем объекты сцены
         let scene_objects_names = Object.getOwnPropertyNames( scene.objects );
@@ -1122,52 +1265,37 @@ function GameInit() {
     game.temp_canvas.context = game.temp_canvas.id.getContext( '2d', { antialias: false, alpha: true } );
     game.temp_canvas.drawRefPoints = DrawRefPoints;
     
-    //Проверяем доступность тача
-    if( 'ontouchstart' in document.documentElement ) {
-        //Мобильное управление
-        game.is_mobile = true;
-    }
-    
-    //Мышь
-    game.canvas.id.addEventListener( 'mousedown', function( e ) {
-        const rect = this.getBoundingClientRect();
-        game.cursor.pos_x = game.cursor.click_x = e.clientX - rect.left;
-        game.cursor.pos_y = game.cursor.click_y = e.clientY - rect.top;
-        game.cursor.pressed = true;
-        
-        //Разрешаем аудио на странице
-        if( !game.audio.enabled ) {
-            game.audio.enabled = true;
-            game.audio.context.resume();
-        }
-        
-        //Мегакостыли для полного экрана (ничего не придумал лучше)
-        if( tmp.menu !== undefined  &&  game.scene === scenes.menu ) {
-            if( tmp.menu.settings !== undefined ) {
-                //Включение/выключение полного экрана в настройках
-                game.scene.objects.settings.update();
-            } else if( tmp.menu.disclaimer !== undefined ) {
-                //Включаем полный экран через нажатие на дисклеймер (если так было сохранено в конфиге)
-                game.scene.objects.disclaimer.update();
-            }
-        }
-    }, false );
-    game.canvas.id.addEventListener( 'mousemove', function( e ) {
-        const rect = this.getBoundingClientRect();
-        game.cursor.pos_x = e.clientX - rect.left;
-        game.cursor.pos_y = e.clientY - rect.top;
-    }, false );
-    document.addEventListener( 'mouseup', function( e ) {
-        game.cursor.pressed = false;
-    }, false );
-    
     //Сообщаем игре, что изменились размеры окна
     window.addEventListener( 'resize', function() {
         tmp.resize_start_ts = performance.now();
         game.canvas.resize = true;
     }, false );
     
-    //Обрабатываем колесико мыши
+    //---------------------------------------------------------------------------------------------
+    //Controls ------------------------------------------------------------------------------------
+    //---------------------------------------------------------------------------------------------
+    
+    //Мышь ----------------------------------------------------------------------------------------
+    game.canvas.id.addEventListener( 'mousedown', function( e ) {
+        let rect = this.getBoundingClientRect();
+        game.cursor.pos_x = game.cursor.click_x = Math.floor( ( e.clientX - rect.left ) / game.canvas.scale );
+        game.cursor.pos_y = game.cursor.click_y = Math.floor( ( e.clientY - rect.top ) / game.canvas.scale );
+        game.cursor.pressed = true;
+        
+        //Звук и полный экран
+        MegaKostyl();
+    }, false );
+    
+    game.canvas.id.addEventListener( 'mousemove', function( e ) {
+        let rect = this.getBoundingClientRect();
+        game.cursor.pos_x = Math.floor( ( e.clientX - rect.left ) / game.canvas.scale );
+        game.cursor.pos_y = Math.floor( ( e.clientY - rect.top ) / game.canvas.scale );
+    }, false );
+    
+    document.addEventListener( 'mouseup', function( e ) {
+        game.cursor.pressed = false;
+    }, false );
+    
     game.canvas.id.addEventListener( 'wheel', function( e ) {
         e = e || window.event;
         let delta = e.deltaY || e.detail || e.wheelDelta;
@@ -1175,12 +1303,56 @@ function GameInit() {
         e.preventDefault ? e.preventDefault() : (e.returnValue = false);
     }, false );
     
+    //Тач -----------------------------------------------------------------------------------------
+    if( 'ontouchstart' in document.documentElement ) {
+        //Мобильное управление
+        game.is_mobile = true;
+    }
     
+    game.canvas.id.addEventListener( 'touchstart', function( e ) {
+        e.preventDefault();
+        
+        //Запрет более 1 касания
+        if( game.cursor.pressed ) return;
+        
+        let touches = e.changedTouches;
+        game.cursor.touch = touches[0].identifier;
+        game.cursor.pressed = true;
+        
+        let rect = this.getBoundingClientRect();
+        game.cursor.pos_x = game.cursor.click_x = Math.floor( ( touches[ 0 ].clientX - rect.left ) / game.canvas.scale );
+        game.cursor.pos_y = game.cursor.click_y = Math.floor( ( touches[ 0 ].clientY - rect.top ) / game.canvas.scale );
+    }, false);
     
-    //---------------------------------------------------------------------------------------------
-    //Keyboard ------------------------------------------------------------------------------------
-    //---------------------------------------------------------------------------------------------
+    game.canvas.id.addEventListener( 'touchmove', function( e ) {
+        game.cursor.pressed = true;
+        
+        let touches = e.changedTouches;
+        let rect = this.getBoundingClientRect();
+        game.cursor.pos_x = Math.floor( ( touches[ 0 ].clientX - rect.left ) / game.canvas.scale );
+        game.cursor.pos_y = Math.floor( ( touches[ 0 ].clientY - rect.top ) / game.canvas.scale );
+    }, false);
     
+    game.canvas.id.addEventListener( 'touchend', function( e ) {
+        game.cursor.pressed = false;
+        
+        let touches = e.changedTouches;
+        game.cursor.touch = touches[0].identifier;
+        game.cursor.pressed = true;
+        
+        let rect = this.getBoundingClientRect();
+        game.cursor.pos_x = game.cursor.click_x = Math.floor( ( touches[ 0 ].clientX - rect.left ) / game.canvas.scale );
+        game.cursor.pos_y = game.cursor.click_y = Math.floor( ( touches[ 0 ].clientY - rect.top ) / game.canvas.scale );
+        
+        //Звук и полный экран
+        MegaKostyl();
+    }, false);
+    
+    document.addEventListener( 'touchcancel', function( e ) {
+        game.cursor.pressed = false;
+    }, false);
+ 
+    //Клавиатура ----------------------------------------------------------------------------------
     document.body.addEventListener ( 'keydown', function( e ) {
         switch( e.keyCode ) {
             case 9: //Tab
@@ -1270,7 +1442,7 @@ function GameInit() {
         window.AudioContext = window.AudioContext || window.webkitAudioContext;
         game.audio.context = new AudioContext();
         game.audio.gain = game.audio.context.createGain();
-        game.audio.gain.gain.value = parseFloat( ( config.volume / 100 ).toFixed( 1 ) );
+        game.audio.gain.gain.value = parseFloat( ( config.sound_volume / 100 ).toFixed( 1 ) );
         game.audio.gain.connect ( game.audio.context.destination );
     } catch(e) {
         return InitError( 'AudioContext' );
@@ -1280,12 +1452,13 @@ function GameInit() {
     document.body.removeChild( document.getElementById( 'error' ) );
     
     //Инициализируем временные переменные
-    tmp.volume = config.volume;
+    tmp.sound_volume = config.sound_volume;
     tmp.fps_max = config.fps_max;
     tmp.resize_start_ts = 0.0;
     tmp.resize_ts = 0.0;
     tmp.update_ts = 0.0;
     tmp.draw_ts = 0.0;
+    tmp.reqAnimFrame = false;
     tmp.fps = {
         frames: 0,
         prev_ts: 0.0
@@ -1298,23 +1471,16 @@ function GameInit() {
         bytes_all: 0,
         bytes_load: 0
     };
-    tmp.loading = [ 1, 4,  1, 9,  1, 14,  0, 20 ];
-    
-    
     
     //---------------------------------------------------------------------------------------------
     //Запуск игры ---------------------------------------------------------------------------------
     //---------------------------------------------------------------------------------------------
     
     //Запускаем сцену загрузки ресурсов
-    StartScene( 'preloader', function() {
-        //Добавляем прогрессбар на сцену
-        game.scene.objects.progressbar.add();
-    });
+    StartScene( 'preloader' );
     
     //Включаем обновление и отрисовку объектов
     setTimeout( UpdateScene, game.delay );
-    window.requestAnimationFrame( DrawScene, game.canvas.id );
     
     //Запускаем загрузкy внешних ресурсов
     LoadResources();
